@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="768" viewBox="0 0 512 768">
+<rect width="512" height="768" fill="#0b0906"/>
+<rect x="10.24" y="15.36" width="491.52" height="737.28" fill="none" stroke="#f0b429" stroke-width="4.096" stroke-dasharray="15.36 10.24"/>
+<text x="256.0" y="384.0" font-family="monospace" font-size="30.72" font-weight="bold" fill="#7db02a" text-anchor="middle">SPROUT</text>
+<text x="256.0" y="675.84" font-family="monospace" font-size="16.384" fill="#f0b429" text-anchor="middle">billboard sprite — green pushing up out of the muck</text>
+<text x="256.0" y="721.92" font-family="monospace" font-size="14.336" fill="#f0b429" text-anchor="middle" opacity="0.7">512x768</text>
+</svg>

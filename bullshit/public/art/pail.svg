@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<rect width="512" height="512" fill="#0b0906"/>
+<rect x="10.24" y="10.24" width="491.52" height="491.52" fill="none" stroke="#6b4a22" stroke-width="4.096" stroke-dasharray="15.36 10.24"/>
+<text x="256.0" y="256.0" font-family="monospace" font-size="30.72" font-weight="bold" fill="#f0b429" text-anchor="middle">PAIL</text>
+<text x="256.0" y="450.56" font-family="monospace" font-size="16.384" fill="#6b4a22" text-anchor="middle">feed pail face — 4 recolors needed, one per beat</text>
+<text x="256.0" y="481.28" font-family="monospace" font-size="14.336" fill="#6b4a22" text-anchor="middle" opacity="0.7">512x512</text>
+</svg>

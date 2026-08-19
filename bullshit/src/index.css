@@ -1,0 +1,333 @@
+/* The palette is anchored on --grass. The scene grade runs green-teal rather
+   than amber, so the accent, the darks and the body text all sit on that axis;
+   only the wood/leather tones stay warm, because they carry the barn's
+   readability. Every colour the DOM uses comes from here — nothing in a
+   component hardcodes one, so the HUD, nav and gate shift with the room. */
+:root {
+  --void: #070b09;
+  --hide: #101613;
+  --muck: #63522a;
+  --muck-hi: #9c8f46;
+  --grass: #7db02a;
+  --accent: #a8d84a;
+  --accent-rgb: 168, 216, 74;
+  --bone: #e8f0e2;
+  --mono: 'IBM Plex Mono', monospace;
+  --display: 'Alfa Slab One', serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--void);
+  color: var(--bone);
+  font-family: var(--mono);
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--void);
+}
+
+/* ---------- gate ---------- */
+.gate {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  text-align: center;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(var(--accent-rgb), 0.06), transparent 70%),
+    var(--void);
+  transition: opacity 1.4s ease, visibility 1.4s;
+}
+.gate.is-open {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.gate-line {
+  font-size: clamp(12px, 1.1vw, 15px);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--muck-hi);
+}
+.gate-title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(44px, 8vw, 104px);
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 0 60px rgba(var(--accent-rgb), 0.25);
+}
+.gate-wordmark {
+  display: block;
+  width: min(560px, 78vw);
+  height: auto;
+  filter: drop-shadow(0 0 40px rgba(var(--accent-rgb), 0.25));
+}
+.gate-sub {
+  max-width: 34ch;
+  font-size: clamp(12px, 1vw, 14px);
+  letter-spacing: 0.12em;
+  color: var(--bone);
+  opacity: 0.7;
+}
+.gate-enter {
+  padding: 0.9em 3.2em;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: clamp(13px, 1vw, 15px);
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.25s ease, color 0.25s ease, opacity 0.25s ease;
+}
+.gate-enter:not(:disabled):hover {
+  background: var(--accent);
+  color: var(--void);
+}
+.gate-enter:disabled {
+  opacity: 0.4;
+  cursor: wait;
+}
+
+/* ---------- HUD ---------- */
+.hud {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+.hud > * {
+  pointer-events: auto;
+}
+.hud-brand {
+  position: absolute;
+  top: 1.4rem;
+  left: 1.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+.hud-brand img {
+  width: 28px;
+  height: 28px;
+  display: block;
+}
+.hud-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 5.4rem;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--muck-hi);
+  animation: hint-pulse 2.6s ease infinite;
+  pointer-events: none;
+}
+@keyframes hint-pulse {
+  50% { opacity: 0.35; }
+}
+
+/* beat panel */
+.panel {
+  position: absolute;
+  left: 1.6rem;
+  bottom: 5.6rem;
+  max-width: min(420px, calc(100vw - 3.2rem));
+  padding: 1.2rem 1.4rem;
+  background: rgba(7, 11, 9, 0.82);
+  border-left: 2px solid var(--accent);
+  backdrop-filter: blur(4px);
+  animation: panel-in 0.5s ease both;
+}
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+.panel-index {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  color: var(--muck-hi);
+}
+.panel-title {
+  margin-top: 0.4rem;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(20px, 2.4vw, 30px);
+  line-height: 1.05;
+  color: var(--bone);
+}
+.panel-body {
+  margin-top: 0.7rem;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--bone);
+  opacity: 0.75;
+}
+
+/* launch hub (gate beat) */
+.launch {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.launch-ca {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--muck-hi);
+  word-break: break-all;
+}
+.socials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+}
+.socials a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.4);
+}
+.socials a:hover {
+  border-bottom-color: var(--accent);
+}
+.socials .tbd {
+  color: var(--muck-hi);
+  opacity: 0.6;
+}
+
+/* ---------- nav dock ---------- */
+.dock {
+  position: absolute;
+  left: 50%;
+  bottom: 1.2rem;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.4rem;
+  max-width: calc(100vw - 2rem);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0.2rem;
+}
+.dock::-webkit-scrollbar {
+  display: none;
+}
+.dock-chip {
+  flex: 0 0 auto;
+  padding: 0.55em 0.9em;
+  border: 1px solid rgba(232, 240, 226, 0.18);
+  background: rgba(7, 11, 9, 0.75);
+  color: var(--bone);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+}
+.dock-chip b {
+  margin-right: 0.5em;
+  color: var(--muck-hi);
+  font-weight: 600;
+}
+.dock-chip:hover {
+  border-color: rgba(var(--accent-rgb), 0.5);
+}
+.dock-chip.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.dock-chip.is-active b {
+  color: var(--accent);
+}
+
+/* ---------- CA-copied toast ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 18%;
+  transform: translateX(-50%);
+  z-index: 90;
+  padding: 0.6em 1.4em;
+  background: rgba(7, 11, 9, 0.88);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  pointer-events: none;
+  animation: toast-in 0.25s ease both;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+}
+
+/* ---------- filmgrain — texture parity where the Noise pass is off ---------- */
+.filmgrain {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0.5;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 3px,
+    rgba(0, 0, 0, 0.06) 3px 4px
+  );
+}
+
+/* ---------- responsive: coarse pointer first, width second ---------- */
+@media (pointer: coarse) {
+  .hud-hint {
+    bottom: 6rem;
+  }
+  .panel {
+    left: 1rem;
+    right: 1rem;
+    bottom: 4.6rem;
+    max-width: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .hud-brand {
+    top: 1rem;
+    left: 1rem;
+  }
+  .panel-body {
+    font-size: 12px;
+    line-height: 1.55;
+  }
+}

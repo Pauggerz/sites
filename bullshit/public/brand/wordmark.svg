@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="256" viewBox="0 0 1024 256">
+<rect width="1024" height="256" fill="#070b09"/>
+<rect x="20.48" y="5.12" width="983.04" height="245.76" fill="none" stroke="#63522a" stroke-width="8.192" stroke-dasharray="30.72 20.48"/>
+<text x="512.0" y="128.0" font-family="monospace" font-size="61.44" font-weight="bold" fill="#a8d84a" text-anchor="middle">$BULLSHIT</text>
+<text x="512.0" y="225.28" font-family="monospace" font-size="32.768" fill="#63522a" text-anchor="middle">wordmark — horizontal lockup</text>
+<text x="512.0" y="240.64" font-family="monospace" font-size="28.672" fill="#63522a" text-anchor="middle" opacity="0.7">1024x256</text>
+</svg>

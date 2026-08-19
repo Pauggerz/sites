@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+<rect width="1280" height="720" fill="#0b0906"/>
+<rect x="25.6" y="14.4" width="1228.8" height="691.1999999999999" fill="none" stroke="#f0b429" stroke-width="10.24" stroke-dasharray="38.4 25.6"/>
+<text x="640.0" y="360.0" font-family="monospace" font-size="76.8" font-weight="bold" fill="#f2e6cf" text-anchor="middle">THE BOARD</text>
+<text x="640.0" y="633.6" font-family="monospace" font-size="40.96" fill="#f0b429" text-anchor="middle">screen idle state — static/noise or slow loop still</text>
+<text x="640.0" y="676.8" font-family="monospace" font-size="35.84" fill="#f0b429" text-anchor="middle" opacity="0.7">1280x720</text>
+</svg>

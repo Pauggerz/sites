@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="256" viewBox="0 0 512 256">
+<rect width="512" height="256" fill="#0b0906"/>
+<rect x="10.24" y="5.12" width="491.52" height="245.76" fill="none" stroke="#7db02a" stroke-width="4.096" stroke-dasharray="15.36 10.24"/>
+<text x="256.0" y="128.0" font-family="monospace" font-size="30.72" font-weight="bold" fill="#f2e6cf" text-anchor="middle">EAR TAG</text>
+<text x="256.0" y="225.28" font-family="monospace" font-size="16.384" fill="#7db02a" text-anchor="middle">numbered cattle ear tag — used for beat markers</text>
+<text x="256.0" y="240.64" font-family="monospace" font-size="14.336" fill="#7db02a" text-anchor="middle" opacity="0.7">512x256</text>
+</svg>

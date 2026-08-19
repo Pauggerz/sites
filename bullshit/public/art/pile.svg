@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+<rect width="1024" height="768" fill="#0b0906"/>
+<rect x="20.48" y="15.36" width="983.04" height="737.28" fill="none" stroke="#f0b429" stroke-width="8.192" stroke-dasharray="30.72 20.48"/>
+<text x="512.0" y="384.0" font-family="monospace" font-size="61.44" font-weight="bold" fill="#6b4a22" text-anchor="middle">THE DROP</text>
+<text x="512.0" y="675.84" font-family="monospace" font-size="32.768" fill="#f0b429" text-anchor="middle">billboard sprite — the pile, transparent bg, steam optional</text>
+<text x="512.0" y="721.92" font-family="monospace" font-size="28.672" fill="#f0b429" text-anchor="middle" opacity="0.7">1024x768</text>
+</svg>

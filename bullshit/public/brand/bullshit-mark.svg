@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<rect width="512" height="512" fill="#070b09"/>
+<rect x="10.24" y="10.24" width="491.52" height="491.52" fill="none" stroke="#a8d84a" stroke-width="4.096" stroke-dasharray="15.36 10.24"/>
+<text x="256.0" y="256.0" font-family="monospace" font-size="30.72" font-weight="bold" fill="#e8f0e2" text-anchor="middle">MARK</text>
+<text x="256.0" y="450.56" font-family="monospace" font-size="16.384" fill="#a8d84a" text-anchor="middle">logo — transparent bg, square, readable at 32px</text>
+<text x="256.0" y="481.28" font-family="monospace" font-size="14.336" fill="#a8d84a" text-anchor="middle" opacity="0.7">512x512</text>
+</svg>
