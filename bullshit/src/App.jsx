@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useProgress } from '@react-three/drei'
 import Experience from './scene/Experience.jsx'
 import {
@@ -9,6 +9,7 @@ import {
   SOCIALS,
 } from './copy.js'
 import { screenMedia } from './screenMedia.js'
+import { makeGateWoodTexture } from './gateWood.js'
 
 // GREY-BOX BUILD: DOM layer is the minimum needed to fly the tour and judge
 // the camera framing. Audio, video, custom cursor, CA pill, and the full gate
@@ -16,16 +17,34 @@ import { screenMedia } from './screenMedia.js'
 
 /* ---------- gate (loading / entry) ---------- */
 function Gate({ open, ready, onEnter }) {
+  // canvas-painted grain/knots/seams, not a CSS gradient standing in for
+  // one — see gateWood.js. Generated once and handed to the stylesheet as
+  // a custom property so the CSS still owns layering/repeat/vignette.
+  const woodUrl = useMemo(() => makeGateWoodTexture(), [])
   return (
-    <div className={`gate ${open ? 'is-open' : ''}`}>
-      <div className="gate-line">{GATE_LINES[0]}</div>
-      <h1 className="gate-title">
-        <img className="gate-wordmark" src="/brand/wordmark.svg" alt="$BULLSHIT" />
-      </h1>
-      <div className="gate-sub">A black bull. A barn. A field that explains itself.</div>
-      <button className="gate-enter" onClick={ready ? onEnter : undefined} disabled={!ready}>
-        <span>{ready ? 'Enter the barn' : 'raising the barn…'}</span>
-      </button>
+    <div className={`gate ${open ? 'is-open' : ''}`} style={{ '--gate-wood': `url(${woodUrl})` }}>
+      {/* the shut fence gate standing in front of the barn — purely
+          decorative, so it's hidden from the accessibility tree and never
+          eats a click meant for the button underneath */}
+      <div className="gate-panel gate-panel-left" aria-hidden="true">
+        <div className="gate-rail gate-rail-top" />
+        <div className="gate-rail gate-rail-bottom" />
+        <div className="gate-brace" />
+      </div>
+      <div className="gate-panel gate-panel-right" aria-hidden="true">
+        <div className="gate-rail gate-rail-top" />
+        <div className="gate-rail gate-rail-bottom" />
+        <div className="gate-brace" />
+      </div>
+      <div className="gate-latch" aria-hidden="true" />
+      <div className="gate-content">
+        <div className="gate-line">{GATE_LINES[0]}</div>
+        <h1 className="gate-title">$BULLSHIT</h1>
+        <div className="gate-sub">A black bull. A barn. A field that explains itself.</div>
+        <button className="gate-enter" onClick={ready ? onEnter : undefined} disabled={!ready}>
+          <span>{ready ? 'Enter the barn' : 'raising the barn…'}</span>
+        </button>
+      </div>
     </div>
   )
 }
@@ -59,8 +78,26 @@ function NavDock({ focus, go }) {
   )
 }
 
+/* ---------- volume ---------- */
+function VolumeControl({ volume, onChange }) {
+  return (
+    <div className="hud-volume">
+      <span>{volume === 0 ? 'muted' : 'vol'}</span>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={volume}
+        onChange={onChange}
+        aria-label="Volume"
+      />
+    </div>
+  )
+}
+
 /* ---------- HUD ---------- */
-function Hud({ entered, focus, go }) {
+function Hud({ entered, focus, go, volume, onVolumeChange }) {
   const beat = focus ? BEATS[focus] : null
   if (!entered) return null
   return (
@@ -69,6 +106,8 @@ function Hud({ entered, focus, go }) {
         <img src="/brand/bullshit-mark.svg" alt="" />
         <span>$BULLSHIT</span>
       </div>
+
+      <VolumeControl volume={volume} onChange={onVolumeChange} />
 
       {!focus && <div className="hud-hint">scroll to walk the barn</div>}
       {beat && (
@@ -110,6 +149,17 @@ export default function App() {
   const [pose, setPose] = useState(null) // dev override
   const [sceneReady, setSceneReady] = useState(false)
   const [caCopied, setCaCopied] = useState(false)
+  const [volume, setVolume] = useState(0.86)
+
+  const onVolumeChange = useCallback((e) => {
+    const v = Number(e.target.value)
+    setVolume(v)
+    const el = screenMedia.el
+    if (el) {
+      el.volume = v
+      el.muted = v === 0
+    }
+  }, [])
 
   // tap on the CA ear tag in the gate scene → clipboard + this toast
   const copyTimer = useRef()
@@ -149,10 +199,10 @@ export default function App() {
         /* not seekable yet — it will still play from wherever it can */
       }
       el.muted = false
-      el.volume = 0.86
+      el.volume = volume
       el.play().catch(() => {})
     }
-  }, [])
+  }, [volume])
 
   // scroll-to-walk: wheel (desktop) and swipe (touch) advance the tour
   // (barn → …beats… → gate) and retreat. Accumulator + cooldown so momentum
@@ -243,7 +293,13 @@ export default function App() {
         onSelect={go}
       />
       <Gate open={entered} ready={sceneReady} onEnter={enter} />
-      <Hud entered={entered} focus={focus} go={go} />
+      <Hud
+        entered={entered}
+        focus={focus}
+        go={go}
+        volume={volume}
+        onVolumeChange={onVolumeChange}
+      />
       {caCopied && <div className="toast">CA COPIED</div>}
       {/* CSS grain stands in for the desktop-only Noise pass on phones */}
       <div className="filmgrain" />

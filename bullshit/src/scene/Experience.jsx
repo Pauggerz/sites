@@ -45,7 +45,10 @@ export default function Experience({ entered, focus, pose, onReady, onCopyCa, on
       // toneMappingExposure is the base stop; Atmosphere damps it up further
       // for the pasture beat
       gl={{ antialias: false, powerPreference: 'high-performance', toneMappingExposure: 5.5 }}
-      camera={{ position: POSES.start.pos, fov: 55, near: 0.1, far: 70 }}
+      // far pushed out for the field beat's horizon treeline and sky backdrop
+      // — everything else in the barn is close range, so the extra depth
+      // buffer range doesn't cost precision where it matters
+      camera={{ position: POSES.start.pos, fov: 55, near: 0.1, far: 190 }}
       style={{ position: 'fixed', inset: 0 }}
     >
       <color attach="background" args={['#0c1512']} />

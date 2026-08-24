@@ -24,10 +24,12 @@ export const POSES = {
     look: [-0.883, 2.866, -0.889],
     parallax: 0.22,
   },
-  // 03 — past the barn door, green, wide: raised above the grass line so the
-  // piles, fence, mist, and moon path read in depth instead of hiding behind
-  // the foreground blades
-  field: { pos: [1.5, 2.7, -3.0], look: [1.5, 0.6, -18] },
+  // 03 — genuinely past the barn door now, not just inside looking through
+  // it: with the eyeline raised to near-level to show the horizon, staying
+  // inside put the door header (y 4.15, only ~1.5m away) right in the top of
+  // frame, cropping the sky. Stepping just past z -5 clears it entirely —
+  // the header is behind the camera instead of between it and the field.
+  field: { pos: [1.5, 2.9, -5.6], look: [1.5, 1.4, -75] },
   // 04 — the muck board: screens, pinned notes, the herd
   board: { pos: [3.2, 1.8, 0.4], look: [6.0, 2.0, 0.4] },
   // 05 — the drive-in: across the barn at the picture on the -x wall, the

@@ -12,6 +12,13 @@
   --accent: #a8d84a;
   --accent-rgb: 168, 216, 74;
   --bone: #e8f0e2;
+  --wood: #140d07;
+  --wood-lo: #060402;
+  --wood-hi: #241708;
+  --iron: #1a1814;
+  --iron-hi: #4a4638;
+  --ooze: #16400f;
+  --ooze-rgb: 22, 64, 15;
   --mono: 'IBM Plex Mono', monospace;
   --display: 'Alfa Slab One', serif;
 }
@@ -46,7 +53,17 @@ a {
   color: var(--void);
 }
 
-/* ---------- gate ---------- */
+/* ---------- gate ----------
+   The whole landing screen is a two-leaf fence gate standing shut in front
+   of the barn — the wordmark/CTA float on top of it like they're posted on
+   the gate itself. "Enter the barn" swings both leaves open on their outer
+   hinges (perspective + rotateY) and fades them out, which is enough on its
+   own to reveal the scene: the canvas behind has been rendering the whole
+   time, the gate was just the thing standing in front of it.
+   Layering back to front: panels (z-auto) → the ooze glow + vignette
+   (z-index 2, painted as ::before/::after of .gate itself so no extra
+   markup) → the latch (z-index 2, same layer as hardware) → gate-content
+   (z-index 3, always legible on top). */
 .gate {
   position: fixed;
   inset: 0;
@@ -57,15 +74,180 @@ a {
   justify-content: center;
   gap: 2rem;
   text-align: center;
-  background:
-    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(var(--accent-rgb), 0.06), transparent 70%),
-    var(--void);
-  transition: opacity 1.4s ease, visibility 1.4s;
+  overflow: hidden;
+  perspective: 1800px;
+  background: var(--void);
+  transition: opacity 1s ease 0.9s, visibility 1s 0.9s;
 }
 .gate.is-open {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+/* the aura: dark green light seeping up through the seam and pooling at
+   the foot of the gate, breathing slowly like it's alive rather than lit */
+.gate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(ellipse 16% 85% at 50% 48%, rgba(var(--ooze-rgb), 0.75), transparent 72%),
+    radial-gradient(ellipse 55% 30% at 50% 100%, rgba(var(--ooze-rgb), 0.65), transparent 75%),
+    radial-gradient(ellipse 30% 45% at 15% 85%, rgba(var(--ooze-rgb), 0.3), transparent 70%),
+    radial-gradient(ellipse 30% 45% at 85% 85%, rgba(var(--ooze-rgb), 0.3), transparent 70%);
+  animation: ooze-breathe 6s ease-in-out infinite;
+}
+/* the vignette: edges eaten by dark, nothing lit but what's directly ahead */
+.gate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background: radial-gradient(
+    ellipse 78% 68% at 50% 46%,
+    transparent 38%,
+    rgba(1, 6, 2, 0.6) 78%,
+    rgba(0, 0, 0, 0.86) 100%
+  );
+}
+@keyframes ooze-breathe {
+  0%, 100% { opacity: 0.7; transform: translateY(0) scaleY(1); }
+  50% { opacity: 1; transform: translateY(-8px) scaleY(1.06); }
+}
+.gate-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(50% - 2px);
+  background-color: var(--wood-lo);
+  background-image:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025), rgba(0, 0, 0, 0.32) 100%),
+    var(--gate-wood);
+  background-repeat: no-repeat, repeat-x;
+  background-size: 100% 100%, auto 100%;
+  background-position: 0 0, 0 0;
+  box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.6);
+  backface-visibility: hidden;
+  transition: transform 1.15s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.15s ease;
+  will-change: transform, opacity;
+}
+/* strap hinges — the iron the gate actually pivots on, bolted near the
+   top and bottom of the outer edge */
+.gate-panel::before,
+.gate-panel::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  width: 19%;
+  height: 5%;
+  border-radius: 2px;
+  background:
+    radial-gradient(circle at 18% 50%, var(--iron-hi) 0 9%, transparent 10%),
+    radial-gradient(circle at 82% 50%, var(--iron-hi) 0 9%, transparent 10%),
+    linear-gradient(to bottom, var(--iron-hi), var(--iron) 55%, #0b0a08);
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.65);
+}
+.gate-panel::before {
+  top: 15%;
+}
+.gate-panel::after {
+  bottom: 15%;
+}
+.gate-panel-left {
+  left: 0;
+  transform-origin: 0% 50%;
+  border-right: 2px solid rgba(0, 0, 0, 0.55);
+}
+.gate-panel-left::before,
+.gate-panel-left::after {
+  left: 3%;
+}
+.gate-panel-right {
+  right: 0;
+  transform-origin: 100% 50%;
+  border-left: 2px solid rgba(0, 0, 0, 0.55);
+}
+.gate-panel-right::before,
+.gate-panel-right::after {
+  right: 3%;
+}
+.gate.is-open .gate-panel-left {
+  transform: rotateY(-108deg);
+  opacity: 0;
+}
+.gate.is-open .gate-panel-right {
+  transform: rotateY(108deg);
+  opacity: 0;
+}
+.gate-rail {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  height: 9%;
+  background: linear-gradient(to bottom, var(--wood-hi), var(--wood-lo));
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+}
+.gate-rail-top {
+  top: 9%;
+}
+.gate-rail-bottom {
+  bottom: 9%;
+}
+.gate-brace {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: 13%;
+  bottom: 13%;
+  background: linear-gradient(
+    120deg,
+    transparent 46.5%,
+    var(--wood-hi) 46.5% 49.5%,
+    var(--wood-lo) 49.5% 52.5%,
+    transparent 52.5%
+  );
+}
+.gate-panel-right .gate-brace {
+  background: linear-gradient(
+    60deg,
+    transparent 46.5%,
+    var(--wood-hi) 46.5% 49.5%,
+    var(--wood-lo) 49.5% 52.5%,
+    transparent 52.5%
+  );
+}
+.gate-latch {
+  position: absolute;
+  top: 84%;
+  left: 50%;
+  z-index: 2;
+  width: clamp(30px, 3.6vw, 46px);
+  height: clamp(30px, 3.6vw, 46px);
+  margin: calc(clamp(30px, 3.6vw, 46px) / -2) 0 0 calc(clamp(30px, 3.6vw, 46px) / -2);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--iron-hi), var(--iron) 60%, #0c0a08 100%);
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 0 26px rgba(0, 0, 0, 0.6), 0 0 30px rgba(var(--ooze-rgb), 0.85);
+  transition: opacity 0.5s ease, transform 0.6s ease;
+}
+.gate.is-open .gate-latch {
+  opacity: 0;
+  transform: scale(0.4);
+}
+.gate-content {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
 }
 .gate-line {
   font-size: clamp(12px, 1.1vw, 15px);
@@ -76,16 +258,22 @@ a {
 .gate-title {
   font-family: var(--display);
   font-weight: 400;
-  font-size: clamp(44px, 8vw, 104px);
+  font-size: clamp(40px, 7.4vw, 96px);
   line-height: 1;
+  letter-spacing: 0.01em;
   color: var(--accent);
-  text-shadow: 0 0 60px rgba(var(--accent-rgb), 0.25);
+  text-shadow:
+    0 0 14px rgba(var(--accent-rgb), 0.55),
+    0 0 46px rgba(var(--ooze-rgb), 0.9),
+    0 0 100px rgba(var(--ooze-rgb), 0.6);
+  animation: title-flicker 5s ease-in-out infinite;
 }
-.gate-wordmark {
-  display: block;
-  width: min(560px, 78vw);
-  height: auto;
-  filter: drop-shadow(0 0 40px rgba(var(--accent-rgb), 0.25));
+@keyframes title-flicker {
+  0%, 44%, 100% { opacity: 1; }
+  45% { opacity: 0.82; }
+  47% { opacity: 1; }
+  71% { opacity: 0.9; }
+  73% { opacity: 1; }
 }
 .gate-sub {
   max-width: 34ch;
@@ -105,11 +293,14 @@ a {
   letter-spacing: 0.28em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.25s ease, color 0.25s ease, opacity 0.25s ease;
+  box-shadow: 0 0 22px rgba(var(--ooze-rgb), 0.5);
+  transition: background 0.25s ease, color 0.25s ease, opacity 0.25s ease,
+    box-shadow 0.25s ease;
 }
 .gate-enter:not(:disabled):hover {
   background: var(--accent);
   color: var(--void);
+  box-shadow: 0 0 26px rgba(var(--accent-rgb), 0.6);
 }
 .gate-enter:disabled {
   opacity: 0.4;
@@ -142,6 +333,53 @@ a {
   width: 28px;
   height: 28px;
   display: block;
+}
+.hud-volume {
+  position: absolute;
+  top: 1.4rem;
+  right: 1.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muck-hi);
+}
+.hud-volume input[type='range'] {
+  width: 110px;
+  height: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(232, 240, 226, 0.18);
+  outline: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.hud-volume input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.hud-volume input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+.hud-volume input[type='range']::-moz-range-track {
+  height: 2px;
+  background: rgba(232, 240, 226, 0.18);
+}
+.hud-volume input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
 }
 .hud-hint {
   position: absolute;
@@ -325,6 +563,14 @@ a {
   .hud-brand {
     top: 1rem;
     left: 1rem;
+  }
+  .hud-volume {
+    top: 1rem;
+    right: 1rem;
+    gap: 0.4rem;
+  }
+  .hud-volume input[type='range'] {
+    width: 64px;
   }
   .panel-body {
     font-size: 12px;

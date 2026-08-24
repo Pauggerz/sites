@@ -15,9 +15,12 @@ import {
   hayMaterial,
   muckMaterial,
   fieldGroundMaterial,
+  shrubMaterial,
   grassBladeMaterial,
   makeBladeGeometry,
   skyMaterial,
+  FOG_COLOR,
+  FOG_FAR,
   lightShaftMaterial,
   mistMaterial,
   dustMaterial,
@@ -507,13 +510,18 @@ function scatterBlades(mesh, count, place) {
 function GrassField() {
   const mat = useMemo(() => grassBladeMaterial(), [])
   const geo = useMemo(() => makeBladeGeometry(), [])
-  const count = IS_MOBILE ? 1600 : 6000
+  // the carpet now runs the full depth of the vista — wide enough that the
+  // side treelines are the only thing bounding it, deep enough to fade into
+  // the horizon haze rather than end on a visible edge
+  const count = IS_MOBILE ? 2200 : 9000
   const ref = useRef()
   useLayoutEffect(() => {
     const rand = makeRand(4242)
     scatterBlades(ref.current, count, (i, p, e, s) => {
-      // denser near the door, thinning toward the treeline
-      p.set(-11 + rand() * 24, 0, -6.2 - Math.pow(rand(), 1.4) * 24)
+      // denser near the door, thinning toward the horizon — starts a little
+      // further out than the old doorway camera so the field pose (now
+      // standing just past the door) doesn't sit inside the carpet
+      p.set(-30 + rand() * 60, 0, -7.4 - Math.pow(rand(), 1.35) * 58)
       // every blade gets its own lean as well as its own yaw
       e.set((rand() - 0.5) * 0.45, rand() * Math.PI, (rand() - 0.5) * 0.45)
       const k = 0.7 + rand() * 0.6
@@ -533,6 +541,11 @@ const FIELD_PILES = [
   [-6.8, -19],
   [1.6, -23],
   [12.5, -13],
+  // the growth keeps going past the near cluster — piles thinning toward
+  // the horizon so the whole field reads as seeded, not just the doorway
+  [-14.5, -27],
+  [17.0, -31],
+  [-4.0, -39],
 ]
 const TUFTS_PER_PILE = IS_MOBILE ? 10 : 18
 
@@ -574,9 +587,36 @@ function FieldPiles() {
   )
 }
 
+// scrub bushes scattered through the growth — smaller and far more numerous
+// than the piles, so the field reads as overrun rather than just seeded.
+// GrassField's blades stand 0.38-1.19m tall (0.95 local height * 0.4-1.25
+// scale) — the old h range here (0.45-1.1, top at 0.92h) topped out at
+// ~1.0m and averaged well under grass height, so most shrubs sat *inside*
+// the carpet instead of standing proud of it and read as having vanished.
+// Sized so even the smallest instance clears the tallest blade.
+const SHRUB_COUNT = IS_MOBILE ? 55 : 130
+
+function Shrubs() {
+  const mat = useMemo(() => shrubMaterial(), [])
+  const geo = useMemo(() => new THREE.IcosahedronGeometry(0.5, 1), [])
+  const ref = useRef()
+  useLayoutEffect(() => {
+    const rand = makeRand(3131)
+    scatterBlades(ref.current, SHRUB_COUNT, (i, p, e, s) => {
+      const x = -30 + rand() * 60
+      const z = -9 - Math.pow(rand(), 1.2) * 60
+      const h = 1.3 + rand() * 0.9
+      p.set(x, h * 0.46, z)
+      e.set((rand() - 0.5) * 0.4, rand() * Math.PI, (rand() - 0.5) * 0.4)
+      s.set(1.0 + rand() * 0.7, h, 1.0 + rand() * 0.7)
+    })
+  }, [])
+  return <instancedMesh ref={ref} args={[geo, mat, SHRUB_COUNT]} frustumCulled={false} />
+}
+
 // post-and-wire fence running away toward the treeline
 const FENCE_A = [-6.8, -7.5]
-const FENCE_B = [0.8, -28.5]
+const FENCE_B = [4.5, -52]
 
 function FenceLine() {
   const post = useMemo(
@@ -591,7 +631,7 @@ function FenceLine() {
   const dz = FENCE_B[1] - FENCE_A[1]
   const len = Math.hypot(dx, dz)
   const yaw = Math.atan2(dx, dz)
-  const posts = 10
+  const posts = 17
   return (
     <group>
       {Array.from({ length: posts }, (_, i) => {
@@ -624,18 +664,43 @@ function FenceLine() {
 
 // flat tree silhouettes between the fence and the sky backdrop
 // clustered left, thinning toward the moon's side so the path stays clear
-const TREES = [
+const TREES_NEAR = [
   [-16, -27, 7, 1],
   [-9.5, -28, 8.5, 2],
   [-1, -29, 6.2, 3],
   [12, -27.5, 9, 4],
   [19, -26, 6.5, 5],
+  [-22.5, -31, 7.5, 6],
+  [-28, -35, 8.5, 7],
+  [26, -33, 7, 8],
+  [-5.5, -37, 9, 9],
 ]
 
-function TreeLine() {
+// mid distance: scattered procedurally rather than hand-placed since it
+// needs to read as a continuous treeline rather than a handful of props.
+// Individual meshes are still worth it out to here — silhouettes are still
+// distinguishable from each other at this range.
+function scatterTrees(count, seed, { xRange, zRange, sizeRange }) {
+  const rand = makeRand(seed)
+  const trees = []
+  for (let i = 0; i < count; i++) {
+    const x = xRange[0] + rand() * (xRange[1] - xRange[0])
+    const z = zRange[0] + rand() * (zRange[1] - zRange[0])
+    const size = sizeRange[0] + rand() * (sizeRange[1] - sizeRange[0])
+    trees.push([x, z, size, (i % 8) + 1])
+  }
+  return trees
+}
+const TREES_MID = scatterTrees(IS_MOBILE ? 16 : 34, 5151, {
+  xRange: [-45, 45],
+  zRange: [-42, -55],
+  sizeRange: [3.6, 6.4],
+})
+
+function TreeLine({ trees }) {
   const mats = useMemo(
     () =>
-      TREES.map(
+      trees.map(
         ([, , , seed]) =>
           new THREE.MeshBasicMaterial({
             map: makeTreeTexture(seed),
@@ -644,12 +709,12 @@ function TreeLine() {
             fog: true,
           })
       ),
-    []
+    [trees]
   )
   return (
     <group>
-      {TREES.map(([x, z, size], i) => (
-        <mesh key={`${x}`} position={[x, size / 2 - 0.2, z]} material={mats[i]}>
+      {trees.map(([x, z, size], i) => (
+        <mesh key={`${x}-${z}-${i}`} position={[x, size / 2 - 0.2, z]} material={mats[i]}>
           <planeGeometry args={[size, size]} />
         </mesh>
       ))}
@@ -657,15 +722,68 @@ function TreeLine() {
   )
 }
 
+/* the horizon itself: hundreds of tiny trees, instanced. A shared silhouette
+   is indistinguishable from individual variety at this distance, and
+   instancing is what makes "hundreds" affordable — one draw call per band
+   however many trees are in it. Fog (fog:true, synced from scene.fog by
+   three automatically) fades the furthest band to almost nothing, which is
+   what actually sells "the treeline never ends" instead of showing an edge. */
+function makeTreeBillboardGeometry() {
+  const g = new THREE.PlaneGeometry(1, 1)
+  g.translate(0, 0.5, 0) // local origin at the trunk base, not centre
+  return g
+}
+
+function TreeCloud({ count, seed, textureSeed, xRange, zRange, sizeRange }) {
+  const mat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        map: makeTreeTexture(textureSeed),
+        transparent: true,
+        alphaTest: 0.3,
+        depthWrite: false,
+        fog: true,
+      }),
+    [textureSeed]
+  )
+  const geo = useMemo(() => makeTreeBillboardGeometry(), [])
+  const ref = useRef()
+  useLayoutEffect(() => {
+    const rand = makeRand(seed)
+    const m = new THREE.Matrix4()
+    const q = new THREE.Quaternion()
+    const p = new THREE.Vector3()
+    const s = new THREE.Vector3()
+    for (let i = 0; i < count; i++) {
+      p.set(
+        xRange[0] + rand() * (xRange[1] - xRange[0]),
+        0,
+        zRange[0] + rand() * (zRange[1] - zRange[0])
+      )
+      const size = sizeRange[0] + rand() * (sizeRange[1] - sizeRange[0])
+      s.set(size, size, size)
+      m.compose(p, q, s)
+      ref.current.setMatrixAt(i, m)
+    }
+    ref.current.instanceMatrix.needsUpdate = true
+  }, [count, seed, xRange, zRange, sizeRange])
+  return <instancedMesh ref={ref} args={[geo, mat, count]} frustumCulled={false} />
+}
+
+const TREES_FAR_COUNT = IS_MOBILE ? 45 : 110
+const TREES_HORIZON_COUNT = IS_MOBILE ? 70 : 170
+
 const MIST_LAYERS = IS_MOBILE
   ? [
-      [1.5, -11, 16, 0],
-      [3, -18, 24, 3],
+      [1.5, -14, 20, 0],
+      [2, -32, 36, 3],
     ]
   : [
       [0, -9.5, 16, 0],
-      [4, -14.5, 20, 3],
-      [-2, -20.5, 26, 6],
+      [4, -16, 24, 3],
+      [-2, -24, 32, 6],
+      [3, -38, 46, 9],
+      [-4, -54, 60, 12],
     ]
 
 function GroundMist() {
@@ -686,7 +804,10 @@ function GroundMist() {
 }
 
 function Pasture({ focus }) {
-  const ground = useMemo(() => fieldGroundMaterial({ scale: 10 }), [])
+  // the ground now runs to a hazy horizon rather than ending at the near
+  // treeline — scale climbs with it so the fbm blotches stay the same
+  // physical size instead of stretching thin
+  const ground = useMemo(() => fieldGroundMaterial({ scale: 42 }), [])
   const sky = useMemo(() => skyMaterial(), [])
   // the moon's path across the grass, laid flat and aimed at where the moon
   // sits on the backdrop
@@ -703,22 +824,49 @@ function Pasture({ focus }) {
   })
   return (
     <group>
-      <mesh position={[0, -0.06, -18]} material={ground}>
-        <boxGeometry args={[44, 0.1, 26]} />
+      <mesh position={[0, -0.06, -60]} material={ground}>
+        <boxGeometry args={[170, 0.1, 130]} />
       </mesh>
-      <mesh position={[1.5, 6.9, -30.6]} material={sky}>
-        <planeGeometry args={[46, 16]} />
+      {/* sized for the frustum, not eyeballed: at ~130m out, the widest pose
+          (68° vertical FOV on portrait phones) needs ~170m of vertical
+          coverage to fill frame — this is more than double that, plus the
+          bottom edge dips below y=0 so it's never a visible seam against the
+          ground, only ever hidden behind it */}
+      <mesh position={[1.5, 100, -132]} material={sky}>
+        <planeGeometry args={[632, 220]} />
       </mesh>
       <GrassField />
       <FieldPiles />
+      <Shrubs />
       <FenceLine />
-      <TreeLine />
+      <TreeLine trees={TREES_NEAR} />
+      <TreeLine trees={TREES_MID} />
+      {/* far band: a proper forest edge, still individually resolvable */}
+      <TreeCloud
+        count={TREES_FAR_COUNT}
+        seed={7171}
+        textureSeed={2}
+        xRange={[-70, 70]}
+        zRange={[-58, -80]}
+        sizeRange={[2.2, 4.2]}
+      />
+      {/* horizon band: dense and tiny, fading almost fully into the fog —
+          this is what makes the field read as endless rather than walled in */}
+      <TreeCloud
+        count={TREES_HORIZON_COUNT}
+        seed={8181}
+        textureSeed={5}
+        xRange={[-130, 130]}
+        zRange={[-85, -125]}
+        sizeRange={[1.1, 2.3]}
+      />
       <GroundMist />
       {/* moonlight path: v=1 (brightest) at the horizon under the moon */}
       <mesh position={[6.0, 0.02, -17]} rotation={[-Math.PI / 2, 0, -0.38]} material={moonPath}>
-        <planeGeometry args={[4.5, 24]} />
+        <planeGeometry args={[6, 48]} />
       </mesh>
-      {/* decay 0: physical falloff from 12m up would eat the whole wash */}
+      {/* decay 0: physical falloff from 12m up would eat the whole wash.
+          distance widened so the cutoff sphere still reaches the new horizon */}
       <Spot
         lightRef={moon}
         position={[1.5, 12, -15]}
@@ -727,29 +875,31 @@ function Pasture({ focus }) {
         penumbra={0.9}
         intensity={1.0}
         color="#b2d977"
-        distance={40}
+        distance={55}
         decay={0}
       />
-      {/* cool steady moon key so the field reads even off-focus */}
+      {/* cool steady moon key so the field reads even off-focus — aimed and
+          reaching further now that the field runs so much deeper */}
       <Spot
         position={[10, 10, -26]}
-        targetPos={[0, 0, -14]}
-        angle={1.1}
+        targetPos={[0, 0, -34]}
+        angle={1.15}
         penumbra={0.9}
-        intensity={2.2}
+        intensity={2.4}
         color="#9bc5b6"
-        distance={45}
+        distance={80}
         decay={0}
       />
-      {/* fireflies — warm, slow, thickest near the piles */}
+      {/* fireflies — warm, slow, thickest near the piles, spread with the
+          wider, deeper field */}
       <Sparkles
-        count={IS_MOBILE ? 40 : 90}
+        count={IS_MOBILE ? 55 : 120}
         size={3}
         speed={0.12}
         opacity={0.7}
         color="#d9ec7c"
-        scale={[22, 2.2, 20]}
-        position={[1.5, 1.1, -16]}
+        scale={[36, 2.4, 40]}
+        position={[1.5, 1.1, -24]}
       />
       <Sparkles
         count={IS_MOBILE ? 12 : 24}
@@ -818,7 +968,7 @@ function MuckBoard({ focus }) {
   })
   return (
     <group>
-      <ScreenBoard focused={focus === 'board'} />
+      <ScreenBoard />
       <pointLight ref={glow} position={[5.2, 2.1, 0.4]} color={GOLD} intensity={1.2} distance={4.5} decay={2} />
 
       {/* pinned notes — the herd keeps its own records */}
@@ -1360,12 +1510,22 @@ function CoolLights() {
 /* ================= atmosphere ================= */
 
 const FOG_IN = new THREE.Color('#0c1512')
-const FOG_OUT = new THREE.Color('#22301d')
+// cooler and darker than the first pass — that version sat almost exactly on
+// top of the shrub colour and the extended ground/grass now covers so much
+// more of the frame that a bright olive haze read as a flat green wall
+// instead of atmospheric distance. This leans toward the sky's own teal so
+// the horizon band actually blends into it rather than fog fighting sky.
+const FOG_OUT = new THREE.Color('#1a2620')
 
 // blue hour, not midnight: roughly two stops up from the old grade. The
 // pasture pushes further so stepping through the door reads as walking outside
 const EXPOSURE_IN = 5.5
 const EXPOSURE_OUT = 7.5
+
+// how far the haze reaches once the field has focus — deep enough that the
+// near and mid treelines stay clear while the horizon band (out past 100)
+// fades almost entirely into it rather than showing a hard edge
+const FIELD_FOG_FAR = 130
 
 function Atmosphere({ focus }) {
   const scene = useThree((s) => s.scene)
@@ -1382,7 +1542,11 @@ function Atmosphere({ focus }) {
     const fog = scene.fog
     if (!fog) return
     fog.color.lerp(out ? FOG_OUT : FOG_IN, 1 - Math.exp(-2.5 * delta))
-    fog.far = THREE.MathUtils.damp(fog.far, out ? 60 : 30, 2, delta)
+    fog.far = THREE.MathUtils.damp(fog.far, out ? FIELD_FOG_FAR : 30, 2, delta)
+    // grassBladeMaterial can't see scene.fog on its own (see materials.js) —
+    // mirror the same values into its shared uniforms every frame
+    FOG_COLOR.value.copy(fog.color)
+    FOG_FAR.value = fog.far
   })
   return null
 }

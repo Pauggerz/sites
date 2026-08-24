@@ -18,6 +18,16 @@ export const TIME = { value: 0 }
 // 0..1, how "outside" the lighting is — Pasture damps this on the field beat
 export const MOON = { value: 0.25 }
 
+// grassBladeMaterial is a raw ShaderMaterial with its own hand-rolled fog
+// chunks (below) rather than three's automatic per-material fog — so it does
+// NOT pick up scene.fog changes on its own the way the lit/standard barn
+// materials do. Atmosphere mirrors scene.fog into these every frame so the
+// pasture's grass hazes out at the same distance as everything else instead
+// of clipping hard at a fixed radius.
+export const FOG_NEAR = { value: 8 }
+export const FOG_FAR = { value: 30 }
+export const FOG_COLOR = { value: new THREE.Color('#0c1512') }
+
 export function tickTime(delta) {
   TIME.value += delta
 }
@@ -130,6 +140,57 @@ export function woodMaterial({
   })
 }
 
+/* ---------------- bulletin board: frame + backing ----------------
+   Deliberately NOT built from woodMaterial. That shader always ends with
+   `wcol *= vec3(1.16, 1.0, 0.84)` — a warm cast baked in for every call,
+   layered on the same grain/knot/seam pattern every timber surface in the
+   barn uses — so no matter what tone was fed in, the board kept reading as
+   "more barn wood" instead of a distinct object. These have their own
+   surface language entirely: flat painted trim (no grain) and a speckled
+   cork-like backing (no planks), both a cool oxblood/charcoal rather than
+   the barn's warm brown.
+   First pass at these landed near-black (base ~0.02) — darker than the
+   scene's own background/fog colour (#0c1512 ≈ 0.05-0.08) and an order of
+   magnitude below every other wood tone in the barn (0.16-0.36). Against a
+   dim scene, "very dark" doesn't read as a distinct material, it reads as
+   the absence of one — indistinguishable from shadow. Brightened well above
+   that floor so the hue actually has something to be seen against. */
+export function boardFrameMaterial() {
+  const mat = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.08 })
+  return patchStandard(mat, {
+    color: /* glsl */ `
+    {
+      float w = bsFbm(vUv * 5.0) * 0.5 + bsNoise(vUv * 24.0) * 0.35;
+      vec3 base = vec3(0.16, 0.05, 0.045);
+      vec3 wornEdge = vec3(0.27, 0.085, 0.06);
+      float edge = 1.0 - 2.0 * min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+      vec3 fcol = mix(base, wornEdge, clamp(max(edge, 0.0) * 1.7 + w * 0.35, 0.0, 1.0));
+      diffuseColor.rgb = fcol;
+    }`,
+  })
+}
+
+export function corkboardMaterial() {
+  const mat = new THREE.MeshStandardMaterial({ roughness: 0.97, metalness: 0 })
+  return patchStandard(mat, {
+    color: /* glsl */ `
+    {
+      float speck = bsNoise(vUv * 95.0) * 0.5 + bsNoise(vUv * 42.0 + 8.0) * 0.5;
+      float patch = bsFbm(vUv * 7.0 + 3.0);
+      vec3 dark = vec3(0.16, 0.095, 0.048);
+      vec3 fleck = vec3(0.27, 0.175, 0.09);
+      vec3 ccol = mix(dark, fleck, smoothstep(0.55, 0.95, speck) * (0.55 + patch * 0.45));
+      // Same problem woodMaterial's warm bias exists to fix: the barn's
+      // teal-green ambient/hemisphere light (see Barn.jsx) washes any
+      // low-saturation dark colour toward green, and this base was close
+      // enough to neutral gray that it bled into the same green as the wall
+      // behind it instead of reading as its own dark-oak board.
+      ccol *= vec3(1.28, 1.0, 0.72);
+      diffuseColor.rgb = ccol;
+    }`,
+  })
+}
+
 /* ---------------- packed dirt with scattered straw ---------------- */
 export function dirtMaterial({ scale = 6 } = {}) {
   const mat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 })
@@ -220,6 +281,29 @@ export function fieldGroundMaterial({ scale = 10 } = {}) {
   })
 }
 
+/* ---------------- scrub: rounded shrubs dotting the pasture ----------------
+   Low-poly icosahedron canopies, mottled dark-to-light green by the same fbm
+   noise as everything else. Standard-lit (not the grass shader), so the
+   moon spot and the field's exposure ramp light them the same way the barn's
+   own dressing gets lit — no separate uniform wiring needed.
+   Kept noticeably darker than FOG_OUT/the pasture haze on purpose: the first
+   pass here landed almost the same tone as the fog it blends toward, so at
+   any real distance the shrubs blended straight into the haze instead of
+   reading as clumps. */
+export function shrubMaterial() {
+  const mat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0, flatShading: true })
+  return patchStandard(mat, {
+    color: /* glsl */ `
+    {
+      float sm = bsFbm(vUv * 6.0);
+      vec3 scol = mix(vec3(0.012, 0.03, 0.012), vec3(0.065, 0.13, 0.038), sm);
+      float sm2 = bsNoise(vUv * 14.0 + 5.0);
+      scol *= 0.72 + sm2 * 0.55;
+      diffuseColor.rgb = scol;
+    }`,
+  })
+}
+
 /* ---------------- picture thrown onto the barn wall ----------------
    Additive quad hovering a hair off the boards: a projector ADDS light, so
    dark image areas stay transparent and the wood grain and batten seams read
@@ -278,9 +362,9 @@ export function grassBladeMaterial({
       uRoot: { value: new THREE.Color(...root) },
       uTip: { value: new THREE.Color(...tip) },
       uSway: { value: sway },
-      fogColor: { value: new THREE.Color('#0c1512') },
-      fogNear: { value: 8 },
-      fogFar: { value: 30 },
+      fogColor: FOG_COLOR,
+      fogNear: FOG_NEAR,
+      fogFar: FOG_FAR,
     },
     vertexShader: /* glsl */ `
       #include <fog_pars_vertex>

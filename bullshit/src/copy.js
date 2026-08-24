@@ -12,35 +12,35 @@ export const BEATS = {
   bull: {
     index: '01 / THE BLACK BULL',
     title: 'THE BLACK BULL.',
-    body: 'He stands where he has always stood. He asks for nothing. He explains nothing. The barn was raised around him and the light was hung for him, and he has never once looked at either.',
+    body: 'He has always been here. The barn was raised for him and the light was hung for him. He does not explain. He does not apologize. He is the bull.',
     label: '01 — THE BLACK BULL',
     nav: 'THE BULL',
   },
   drop: {
     index: '02 / THE SHIT',
     title: 'THE SHIT.',
-    body: 'He lifts it. He does not set it down and he does not look at it. What the ground would have taken, he holds up instead — steady, at the height of his shoulder, for as long as anyone cares to look.',
+    body: 'All the power in the world, and he holds it in one hand. Do not touch it.',
     label: '02 — THE SHIT',
     nav: 'THE SHIT',
   },
   field: {
     index: '03 / IT GROWS',
     title: 'IT GROWS.',
-    body: 'No one planted this. The ground was rich and the ground did the rest. From one gift, a whole green field. The harvest keeps its own schedule and answers to no one.',
+    body: 'Nobody planted this. It spread on its own. It has not stopped since.',
     label: '03 — IT GROWS',
     nav: 'THE FIELD',
   },
   board: {
     index: '04 / THE HERD',
     title: 'THE HERD.',
-    body: 'The herd keeps its own records. Names counted. Notes pinned. Nothing promised. They came to the barn, they saw what the ground can do, and they stayed.',
+    body: 'Nothing was promised. Everything was recorded. The herd is counted. The herd is fed. The herd is accounted for.',
     label: '04 — THE HERD',
     nav: 'THE HERD',
   },
   gate: {
     index: '05 / THE GATE',
     title: 'THE GATE.',
-    body: 'The gate is not locked. It never was. Come stand in the field, or watch from the fence — the field does not mind either way. The field is busy growing.',
+    body: 'The gate is open. Accelerate.',
     label: '05 — THE GATE',
     nav: 'THE GATE',
     cta: true,
@@ -77,16 +77,16 @@ export const SCENE_TEXT = {
 
 // TODO(launch): hard facts from BRIEF.md — never invent a value. Placeholders
 // stay visible in the build until the real ones land.
-export const CONTRACT_ADDRESS = '<<TBD>>'
+export const CONTRACT_ADDRESS = 'zj1jpp7QMveWHLs61vL9KMZf254KvW7j4AAmBF8ry2k'
 
 // TODO(launch): community link (Telegram)
-export const JOIN_URL = '<<TBD>>'
+export const JOIN_URL = ''
 
 // TODO(launch): chart link — labeled "$BULLSHIT ↗", never "buy"
-export const TOKEN_URL = '<<TBD>>'
+export const TOKEN_URL = 'https://dexscreener.com/solana/cd5hdt23sjgud5vtwsv51bmpey2qf9qh5cyswwmjbddq'
 
 export const SOCIALS = [
   { label: 'X / TWITTER', url: 'https://x.com/BULLSHIT_ANSEM' },
-  { label: 'CHART', url: '<<TBD>>' },
-  { label: 'TELEGRAM', url: '<<TBD>>' },
+  { label: 'CHART', url: 'https://dexscreener.com/solana/cd5hdt23sjgud5vtwsv51bmpey2qf9qh5cyswwmjbddq' },
+  { label: 'TELEGRAM', url: '' },
 ]
