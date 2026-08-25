@@ -68,12 +68,77 @@ export const SCENE_TEXT = {
     sub: 'PROVIDES ALL DAY.',
     foot: 'SINCE THE BEGINNING',
   },
+  posterWanted: {
+    title: 'WANTED',
+    sub: 'ONE BLACK BULL',
+    sub2: 'ANSWERS TO NOTHING',
+    foot: 'APPROACH ON FOOT',
+  },
+  posterNotice: {
+    title: 'NOTICE',
+    sub: 'NO EXPLANATIONS',
+    sub2: 'NO APOLOGIES',
+    foot: 'BY ORDER OF THE BULL',
+  },
   notes: ['DAY 41. IT GREW.', 'HEADCOUNT: ALL.', 'GATE OPEN. FIELD FINE.', 'RAIN CAME. GOOD.'],
   sack: { title: 'BULL FEED', sub: 'NET WT 50 LB' },
   tag: { number: '01', brand: '$BULLSHIT' },
   caTag: { title: 'CA', hint: 'TAP TO COPY' },
   boardIdle: { title: '$BULLSHIT', sub: 'STAND BY. THE HERD IS GRAZING.' },
 }
+
+// the origin story is split across two altitudes: the six piles carry the
+// grounded, procedural parts (found by hovering/tapping, same as before);
+// the three the story roots itself before the field ever existed — the
+// bull, the mascot, the fact that it hasn't stopped — read as myth instead
+// of field notes, so they went up into the constellation over the field
+// (STAR_LORE) rather than staying underfoot. Same voice as BEATS either way:
+// no names, no numbers, no claim that anyone real endorsed this. What
+// actually happened is kept, but Ansem is never named or quoted, and the
+// burn total is never given a figure — both would put words or a hard
+// number in a real person's mouth, which the house rule above forbids even
+// here.
+export const PILE_LORE = [
+  {
+    title: 'WHAT HE PRODUCES',
+    body: 'Above all else, one thing. The field is only proof of the volume.',
+  },
+  {
+    title: 'BURIED, THEN FOUND',
+    body: 'Launched deep in a wall of tickers, unlabeled among hundreds. Found anyway. Word of mouth. Feed instinct.',
+  },
+  {
+    title: 'THE BURN',
+    body: 'The herd did not wait for a name. It organized, pooled what it had, and burned it to reach the gold tier. No one asked why.',
+  },
+  {
+    title: 'THE RECORD',
+    body: 'It was noted, once, from higher up the chain, that this herd was first to put up a proper page and keep it fed. Nothing more was said. Nothing more was needed.',
+  },
+  {
+    title: 'THE MISSION',
+    body: "There isn't one. There is a joke, and the joke has outlasted every mission statement written near it.",
+  },
+  {
+    title: 'THE FIELD CREW',
+    body: 'Poorgoat. Dior. Chairman. LJC. The trenches. Names on a barn beam, not a whitepaper — the herd runs on people.',
+  },
+]
+
+export const STAR_LORE = [
+  {
+    title: 'THE BLACK BULL',
+    body: 'Before the field, there was the bull. Bottom-called, fully bought in, never explaining itself. The market took that conviction and made noise of it.',
+  },
+  {
+    title: 'THE MASCOT',
+    body: 'A bull that produces gold. Nothing metaphorical about it. That is the whole animal, the whole joke, the whole operation.',
+  },
+  {
+    title: 'STILL GROWING',
+    body: "Nobody planted this on purpose. It kept spreading anyway... on the ground, and now written above it too.",
+  },
+]
 
 // TODO(launch): hard facts from BRIEF.md — never invent a value. Placeholders
 // stay visible in the build until the real ones land.

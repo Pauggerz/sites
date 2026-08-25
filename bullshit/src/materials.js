@@ -495,6 +495,42 @@ export function lightShaftMaterial({ color = '#92bcb1', intensity = 0.35 } = {})
   })
 }
 
+/* ---------------- soft radial glow disc (billboarded) ----------------
+   A camera-facing plane, additive, brighter core + soft falloff — no
+   texture, just distance-from-center math. Used for the field piles' hover
+   aura (Barn.jsx): color and intensity are mutated per-frame by the caller
+   (own uniforms per instance, so each pile flares independently). */
+export function glowAuraMaterial({ color = '#a8d84a', intensity = 1 } = {}) {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uIntensity: { value: intensity },
+    },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor; uniform float uIntensity;
+      varying vec2 vUv;
+      void main() {
+        float d = length(vUv - 0.5) * 2.0;
+        float halo = smoothstep(1.0, 0.0, d);
+        float core = smoothstep(0.4, 0.0, d);
+        float a = (halo * 0.6 + core) * uIntensity;
+        gl_FragColor = vec4(uColor * a, a);
+      }
+    `,
+  })
+}
+
 /* ---------------- low ground mist over the pasture ----------------
    Vertical planes facing the barn; fbm drifts sideways, alpha hugs the
    bottom of the plane and dies before the top. Normal blending — additive
@@ -672,6 +708,63 @@ export function makePosterFeedTexture() {
     g.fillStyle = '#3a2510'
     g.font = `600 ${w * 0.055}px ${MONO}`
     g.fillText(T.sub, w / 2, h * 0.76)
+    g.font = `500 ${w * 0.042}px ${MONO}`
+    g.fillText(T.foot, w / 2, h * 0.92)
+  })
+}
+
+export function makePosterWantedTexture() {
+  const T = SCENE_TEXT.posterWanted
+  return makeCanvas(512, 683, (g, w, h) => {
+    agedPaper(g, w, h, '#c9b788')
+    g.textAlign = 'center'
+    g.fillStyle = '#2b1f10'
+    g.font = `400 ${w * 0.16}px ${SLAB}`
+    g.fillText(T.title, w / 2, h * 0.2)
+    // a couple of curved strokes standing in for horns — no likeness
+    // needed, just enough that the poster reads as being about the bull
+    g.strokeStyle = '#2b1f10'
+    g.lineWidth = w * 0.018
+    g.lineCap = 'round'
+    g.beginPath()
+    g.moveTo(w * 0.36, h * 0.44)
+    g.quadraticCurveTo(w * 0.27, h * 0.28, w * 0.21, h * 0.3)
+    g.moveTo(w * 0.64, h * 0.44)
+    g.quadraticCurveTo(w * 0.73, h * 0.28, w * 0.79, h * 0.3)
+    g.stroke()
+    g.beginPath()
+    g.arc(w / 2, h * 0.44, w * 0.15, 0, Math.PI * 2)
+    g.stroke()
+    g.fillStyle = '#2b1f10'
+    g.font = `600 ${w * 0.06}px ${MONO}`
+    g.fillText(T.sub, w / 2, h * 0.7)
+    g.font = `600 ${w * 0.05}px ${MONO}`
+    g.fillText(T.sub2, w / 2, h * 0.77)
+    g.font = `500 ${w * 0.042}px ${MONO}`
+    g.fillText(T.foot, w / 2, h * 0.92)
+  })
+}
+
+export function makePosterNoticeTexture() {
+  const T = SCENE_TEXT.posterNotice
+  return makeCanvas(512, 683, (g, w, h) => {
+    agedPaper(g, w, h, '#d8cba3')
+    g.textAlign = 'center'
+    g.fillStyle = '#241a0c'
+    g.font = `400 ${w * 0.155}px ${SLAB}`
+    g.fillText(T.title, w / 2, h * 0.26)
+    // a posted-order double rule under the title
+    g.strokeStyle = '#241a0c'
+    g.lineWidth = 2
+    g.beginPath()
+    g.moveTo(w * 0.16, h * 0.31)
+    g.lineTo(w * 0.84, h * 0.31)
+    g.moveTo(w * 0.16, h * 0.325)
+    g.lineTo(w * 0.84, h * 0.325)
+    g.stroke()
+    g.font = `600 ${w * 0.075}px ${MONO}`
+    g.fillText(T.sub, w / 2, h * 0.5)
+    g.fillText(T.sub2, w / 2, h * 0.58)
     g.font = `500 ${w * 0.042}px ${MONO}`
     g.fillText(T.foot, w / 2, h * 0.92)
   })

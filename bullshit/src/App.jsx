@@ -10,39 +10,179 @@ import {
 } from './copy.js'
 import { screenMedia } from './screenMedia.js'
 import { makeGateWoodTexture } from './gateWood.js'
+import { playChainRattle } from './chainRattle.js'
+
+// asymmetric on purpose — four different chains that happened to get nailed
+// up (two per door), not one asset mirrored and stamped four times
+const CHAIN_LINKS_LEFT = 5
+const CHAIN_LINKS_LEFT_2 = 4
+const CHAIN_LINKS_RIGHT = 7
+const CHAIN_LINKS_RIGHT_2 = 6
 
 // GREY-BOX BUILD: DOM layer is the minimum needed to fly the tour and judge
 // the camera framing. Audio, video, custom cursor, CA pill, and the full gate
 // treatment come after the scene is approved.
 
+// how close to the seam (px, either side) flips the peek on — something to
+// do with the cursor while "raising the barn…" sits disabled. It's a binary
+// switch, not an analog follow: crossing the boundary sets one fixed target
+// and the panel's own CSS transition eases to it. Driving --peek off the raw
+// cursor distance instead made the leaves chase every pixel of mouse jitter,
+// retargeting mid-transition and reading as a twitch rather than a peek.
+// PEEK_HYSTERESIS gives the on/off edges some slack so hovering exactly on
+// the boundary can't flicker the switch back and forth.
+const PEEK_RANGE = 160
+const PEEK_HYSTERESIS = 24
+const PEEK_MAX_PX = 46
+const PEEK_MAX_DEG = 7
+
+// a chain rattles (visually and audibly) on hover or touch, something to
+// poke at while "raising the barn…" sits disabled. Re-triggered on every
+// pointerenter/pointerdown rather than tied to a single CSS animation-in
+// so it can restart mid-swing if someone pokes it again. One hook instance
+// per chain, since the two doors' chains rattle independently.
+function useChainRattle() {
+  const ref = useRef(null)
+  const timer = useRef(0)
+  const rattle = useCallback(() => {
+    playChainRattle()
+    const el = ref.current
+    if (!el) return
+    el.classList.remove('is-rattling')
+    void el.offsetWidth // restart the keyframes even if still mid-swing
+    el.classList.add('is-rattling')
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => el.classList.remove('is-rattling'), 700)
+  }, [])
+  useEffect(() => () => clearTimeout(timer.current), [])
+  return [ref, rattle]
+}
+
 /* ---------- gate (loading / entry) ---------- */
-function Gate({ open, ready, onEnter }) {
+function Gate({ open, ready, progress, onEnter }) {
   // canvas-painted grain/knots/seams, not a CSS gradient standing in for
   // one — see gateWood.js. Generated once and handed to the stylesheet as
   // a custom property so the CSS still owns layering/repeat/vignette.
   const woodUrl = useMemo(() => makeGateWoodTexture(), [])
+  const rootRef = useRef(null)
+
+  // peek-through-the-crack: pointer proximity to the seam widens the gap
+  // and tilts both leaves a hair — set directly on the element (not via
+  // React state) so it tracks every pointermove without a re-render, and
+  // stops entirely once the gate is actually open.
+  useEffect(() => {
+    if (open) return
+    const el = rootRef.current
+    if (!el) return
+    let peeking = false
+    const onMove = (e) => {
+      const rect = el.getBoundingClientRect()
+      const dx = Math.abs(e.clientX - (rect.left + rect.width / 2))
+      // hysteresis: the threshold to turn off is wider than the one to turn
+      // on, so sitting right on the boundary can't chatter the switch
+      const threshold = peeking ? PEEK_RANGE + PEEK_HYSTERESIS : PEEK_RANGE
+      const next = dx < threshold
+      if (next === peeking) return
+      peeking = next
+      el.style.setProperty('--peek', next ? `${PEEK_MAX_PX}px` : '0px')
+      el.style.setProperty('--peek-tilt', next ? `${PEEK_MAX_DEG}deg` : '0deg')
+    }
+    window.addEventListener('pointermove', onMove)
+    return () => window.removeEventListener('pointermove', onMove)
+  }, [open])
+
+  const [chainLeftRef, rattleLeft] = useChainRattle()
+  const [chainLeft2Ref, rattleLeft2] = useChainRattle()
+  const [chainRightRef, rattleRight] = useChainRattle()
+  const [chainRight2Ref, rattleRight2] = useChainRattle()
+
   return (
-    <div className={`gate ${open ? 'is-open' : ''}`} style={{ '--gate-wood': `url(${woodUrl})` }}>
-      {/* the shut fence gate standing in front of the barn — purely
-          decorative, so it's hidden from the accessibility tree and never
-          eats a click meant for the button underneath */}
+    <div className={`gate ${open ? 'is-open' : ''}`} ref={rootRef} style={{ '--gate-wood': `url(${woodUrl})` }}>
+      {/* the fence gate standing shut in front of the barn — mostly
+          decorative (aria-hidden), except each door's chain, which reacts
+          to hover/touch so it stays reachable/interactive */}
       <div className="gate-panel gate-panel-left" aria-hidden="true">
         <div className="gate-rail gate-rail-top" />
         <div className="gate-rail gate-rail-bottom" />
         <div className="gate-brace" />
+        <div className="gate-half-latch gate-half-latch-l" />
+        <div
+          className="gate-chain gate-chain-left"
+          ref={chainLeftRef}
+          onPointerEnter={rattleLeft}
+          onPointerDown={rattleLeft}
+        >
+          {Array.from({ length: CHAIN_LINKS_LEFT }, (_, i) => (
+            <span key={i} className="chain-link" />
+          ))}
+        </div>
+        <div
+          className="gate-chain gate-chain-left-2"
+          ref={chainLeft2Ref}
+          onPointerEnter={rattleLeft2}
+          onPointerDown={rattleLeft2}
+        >
+          {Array.from({ length: CHAIN_LINKS_LEFT_2 }, (_, i) => (
+            <span key={i} className="chain-link" />
+          ))}
+        </div>
       </div>
       <div className="gate-panel gate-panel-right" aria-hidden="true">
         <div className="gate-rail gate-rail-top" />
         <div className="gate-rail gate-rail-bottom" />
         <div className="gate-brace" />
+        <div className="gate-half-latch gate-half-latch-r" />
+        <div
+          className="gate-chain gate-chain-right"
+          ref={chainRightRef}
+          onPointerEnter={rattleRight}
+          onPointerDown={rattleRight}
+        >
+          {Array.from({ length: CHAIN_LINKS_RIGHT }, (_, i) => (
+            <span key={i} className="chain-link" />
+          ))}
+        </div>
+        <div
+          className="gate-chain gate-chain-right-2"
+          ref={chainRight2Ref}
+          onPointerEnter={rattleRight2}
+          onPointerDown={rattleRight2}
+        >
+          {Array.from({ length: CHAIN_LINKS_RIGHT_2 }, (_, i) => (
+            <span key={i} className="chain-link" />
+          ))}
+        </div>
       </div>
-      <div className="gate-latch" aria-hidden="true" />
       <div className="gate-content">
         <div className="gate-line">{GATE_LINES[0]}</div>
-        <h1 className="gate-title">$BULLSHIT</h1>
+        <h1 className="gate-title">
+          <span className="gate-title-dollar">$</span>
+          <span className="gate-title-word gate-title-bull" data-text="BULL">BULL</span>
+          <span className="gate-title-word gate-title-shit" data-text="SHIT">SHIT</span>
+        </h1>
         <div className="gate-sub">A black bull. A barn. A field that explains itself.</div>
         <button className="gate-enter" onClick={ready ? onEnter : undefined} disabled={!ready}>
-          <span>{ready ? 'Enter the barn' : 'raising the barn…'}</span>
+          {/* real load progress (useProgress), not a fake spinner — it can
+              sit at a false 100% between asset batches (see the "ready"
+              signal note elsewhere), so the dots keep moving even if the
+              fill itself briefly plateaus */}
+          {!ready && (
+            <span
+              className="gate-enter-fill"
+              style={{ transform: `scaleX(${Math.min(1, Math.max(0, progress / 100))})` }}
+              aria-hidden="true"
+            />
+          )}
+          <span className="gate-enter-label">
+            {ready ? 'Enter the barn' : 'raising the barn'}
+            {!ready && (
+              <span className="gate-enter-dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            )}
+          </span>
         </button>
       </div>
     </div>
@@ -292,7 +432,7 @@ export default function App() {
         onCopyCa={onCopyCa}
         onSelect={go}
       />
-      <Gate open={entered} ready={sceneReady} onEnter={enter} />
+      <Gate open={entered} ready={sceneReady} progress={progress} onEnter={enter} />
       <Hud
         entered={entered}
         focus={focus}

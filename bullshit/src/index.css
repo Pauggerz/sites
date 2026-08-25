@@ -12,11 +12,14 @@
   --accent: #a8d84a;
   --accent-rgb: 168, 216, 74;
   --bone: #e8f0e2;
+  --bone-rgb: 232, 240, 226;
   --wood: #140d07;
   --wood-lo: #060402;
   --wood-hi: #241708;
   --iron: #1a1814;
   --iron-hi: #4a4638;
+  --chain: #060606;
+  --chain-hi: #3d3e42;
   --ooze: #16400f;
   --ooze-rgb: 22, 64, 15;
   --mono: 'IBM Plex Mono', monospace;
@@ -60,10 +63,11 @@ a {
    hinges (perspective + rotateY) and fades them out, which is enough on its
    own to reveal the scene: the canvas behind has been rendering the whole
    time, the gate was just the thing standing in front of it.
-   Layering back to front: panels (z-auto) → the ooze glow + vignette
-   (z-index 2, painted as ::before/::after of .gate itself so no extra
-   markup) → the latch (z-index 2, same layer as hardware) → gate-content
-   (z-index 3, always legible on top). */
+   Layering back to front: panels, each carrying its own half of the split
+   latch as a child (so that half moves with its door) → the ooze glow +
+   vignette (z-index 2, painted as ::before/::after of .gate itself so no
+   extra markup) and the draped chain (z-index 1, doesn't split — it just
+   hangs there) → gate-content (z-index 3, always legible on top). */
 .gate {
   position: fixed;
   inset: 0;
@@ -94,11 +98,19 @@ a {
   pointer-events: none;
   mix-blend-mode: screen;
   background:
-    radial-gradient(ellipse 16% 85% at 50% 48%, rgba(var(--ooze-rgb), 0.75), transparent 72%),
+    radial-gradient(
+      ellipse calc(16% + var(--peek, 0px) * 1.6) 85% at 50% 48%,
+      rgba(var(--ooze-rgb), 0.75),
+      transparent 72%
+    ),
     radial-gradient(ellipse 55% 30% at 50% 100%, rgba(var(--ooze-rgb), 0.65), transparent 75%),
     radial-gradient(ellipse 30% 45% at 15% 85%, rgba(var(--ooze-rgb), 0.3), transparent 70%),
     radial-gradient(ellipse 30% 45% at 85% 85%, rgba(var(--ooze-rgb), 0.3), transparent 70%);
   animation: ooze-breathe 6s ease-in-out infinite;
+  /* --peek now flips between two fixed values instead of following the
+     cursor continuously (App.jsx), so the glow needs its own transition to
+     ease the seam-ellipse between those two sizes instead of popping. */
+  transition: background 0.5s cubic-bezier(0.22, 0.9, 0.32, 1);
 }
 /* the vignette: edges eaten by dark, nothing lit but what's directly ahead */
 .gate::after {
@@ -133,7 +145,11 @@ a {
   background-position: 0 0, 0 0;
   box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.6);
   backface-visibility: hidden;
-  transition: transform 1.15s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.15s ease;
+  /* idle state: fast, damped follow for the mouse-driven peek below. The
+     slow swing-open transition only takes over once .is-open is added
+     (see the override further down) — a single shared duration would make
+     the peek lag behind the cursor instead of tracking it live. */
+  transition: transform 0.5s cubic-bezier(0.22, 0.9, 0.32, 1), opacity 1.15s ease;
   will-change: transform, opacity;
 }
 /* strap hinges — the iron the gate actually pivots on, bolted near the
@@ -162,6 +178,11 @@ a {
   left: 0;
   transform-origin: 0% 50%;
   border-right: 2px solid rgba(0, 0, 0, 0.55);
+  /* peek-through-the-crack: pointer proximity to the seam (App.jsx) nudges
+     this leaf left and gives it a hair of the same rotateY the full open
+     swing uses below — something to do while "raising the barn…" sits
+     disabled. The var() defaults keep it inert before JS ever runs. */
+  transform: translateX(calc(var(--peek, 0px) * -1)) rotateY(calc(var(--peek-tilt, 0deg) * -1));
 }
 .gate-panel-left::before,
 .gate-panel-left::after {
@@ -171,10 +192,17 @@ a {
   right: 0;
   transform-origin: 100% 50%;
   border-left: 2px solid rgba(0, 0, 0, 0.55);
+  transform: translateX(var(--peek, 0px)) rotateY(var(--peek-tilt, 0deg));
 }
 .gate-panel-right::before,
 .gate-panel-right::after {
   right: 3%;
+}
+.gate.is-open .gate-panel-left,
+.gate.is-open .gate-panel-right {
+  /* the real swing takes over completely, at its own slower pace — the
+     peek's fast transition would make this look rushed */
+  transition: transform 1.15s cubic-bezier(0.7, 0, 0.3, 1), opacity 1.15s ease;
 }
 .gate.is-open .gate-panel-left {
   transform: rotateY(-108deg);
@@ -223,23 +251,110 @@ a {
     transparent 52.5%
   );
 }
-.gate-latch {
+/* the latch — split into two halves, one riveted to each leaf, so it tears
+   apart and swings away WITH the door instead of just fading in place.
+   Each half is a real child of its .gate-panel, so it inherits that
+   panel's transform (peek AND the full open swing) for free; no separate
+   transform rules needed here at all, just the shape. Positioned flush
+   against the seam-facing edge of its own panel so the two halves meet
+   and read as one circle while the gate is shut. */
+:root {
+  --latch-d: clamp(30px, 3.6vw, 46px);
+}
+.gate-half-latch {
   position: absolute;
   top: 84%;
-  left: 50%;
-  z-index: 2;
-  width: clamp(30px, 3.6vw, 46px);
-  height: clamp(30px, 3.6vw, 46px);
-  margin: calc(clamp(30px, 3.6vw, 46px) / -2) 0 0 calc(clamp(30px, 3.6vw, 46px) / -2);
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, var(--iron-hi), var(--iron) 60%, #0c0a08 100%);
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.08) inset,
-    0 0 26px rgba(0, 0, 0, 0.6), 0 0 30px rgba(var(--ooze-rgb), 0.85);
-  transition: opacity 0.5s ease, transform 0.6s ease;
+  transform: translateY(-50%);
+  width: calc(var(--latch-d) / 2);
+  height: var(--latch-d);
+  z-index: 1;
+  background-image: radial-gradient(
+    circle at 35% 30%,
+    var(--iron-hi),
+    var(--iron) 60%,
+    #0c0a08 100%
+  );
+  background-size: var(--latch-d) var(--latch-d);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 0 20px rgba(0, 0, 0, 0.6),
+    0 0 22px rgba(var(--ooze-rgb), 0.85);
 }
-.gate.is-open .gate-latch {
-  opacity: 0;
-  transform: scale(0.4);
+.gate-half-latch-l {
+  right: 0;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  border-radius: calc(var(--latch-d) / 2) 0 0 calc(var(--latch-d) / 2);
+}
+.gate-half-latch-r {
+  left: 0;
+  background-position: calc(var(--latch-d) / -2) 0;
+  background-repeat: no-repeat;
+  border-radius: 0 calc(var(--latch-d) / 2) calc(var(--latch-d) / 2) 0;
+}
+/* the chains — two per leaf, deliberately not mirror images of each other
+   (different length, different perch) so the set reads as separate things
+   that happened to get nailed up rather than one decorative asset stamped
+   four times. Each is a real child of its .gate-panel, so — same trick
+   as the half-latch — it inherits that panel's transform for free and
+   swings/peeks with its own door with no extra transform rules here.
+   Hover or touch rocks it (chain-rattle) and plays a synthesized rattle
+   (chainRattle.js). */
+.gate-chain {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: top center;
+  cursor: pointer;
+  pointer-events: auto;
+  /* lifts the chain off the wood behind it — black links on a near-black
+     backdrop otherwise disappear into the grain */
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.85));
+}
+.gate-chain-left {
+  top: 21%;
+  left: 30%;
+}
+.gate-chain-left-2 {
+  top: 40%;
+  left: 46%;
+}
+.gate-chain-right {
+  top: 33%;
+  right: 21%;
+}
+.gate-chain-right-2 {
+  top: 16%;
+  right: 40%;
+}
+.chain-link {
+  width: clamp(13px, 1.6vw, 19px);
+  height: clamp(25px, 3.1vw, 35px);
+  margin-top: clamp(-18px, -2.3vw, -13px);
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--chain-hi), var(--chain) 45%, #000 88%);
+  box-shadow:
+    inset 1px 1px 1.5px rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1.5px rgba(0, 0, 0, 0.8),
+    0 2px 3px rgba(0, 0, 0, 0.8);
+}
+.chain-link:first-child {
+  margin-top: 0;
+}
+.chain-link:nth-child(even) {
+  transform: rotate(90deg);
+}
+.gate-chain.is-rattling {
+  animation: chain-rattle 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+@keyframes chain-rattle {
+  0%, 100% { transform: rotate(0deg); }
+  12% { transform: rotate(-10deg); }
+  28% { transform: rotate(8deg); }
+  44% { transform: rotate(-6deg); }
+  60% { transform: rotate(4deg); }
+  76% { transform: rotate(-2deg); }
+  90% { transform: rotate(1deg); }
 }
 .gate-content {
   position: relative;
@@ -261,11 +376,6 @@ a {
   font-size: clamp(40px, 7.4vw, 96px);
   line-height: 1;
   letter-spacing: 0.01em;
-  color: var(--accent);
-  text-shadow:
-    0 0 14px rgba(var(--accent-rgb), 0.55),
-    0 0 46px rgba(var(--ooze-rgb), 0.9),
-    0 0 100px rgba(var(--ooze-rgb), 0.6);
   animation: title-flicker 5s ease-in-out infinite;
 }
 @keyframes title-flicker {
@@ -275,6 +385,82 @@ a {
   71% { opacity: 0.9; }
   73% { opacity: 1; }
 }
+.gate-title-dollar {
+  color: var(--accent);
+  text-shadow:
+    0 0 14px rgba(var(--accent-rgb), 0.55),
+    0 0 46px rgba(var(--ooze-rgb), 0.9),
+    0 0 100px rgba(var(--ooze-rgb), 0.6);
+}
+.gate-title-bull {
+  color: var(--bone);
+  text-shadow:
+    0 0 14px rgba(var(--bone-rgb), 0.5),
+    0 0 46px rgba(var(--ooze-rgb), 0.9),
+    0 0 100px rgba(var(--ooze-rgb), 0.6);
+}
+.gate-title-shit {
+  color: var(--accent);
+  text-shadow:
+    0 0 14px rgba(var(--accent-rgb), 0.55),
+    0 0 46px rgba(var(--ooze-rgb), 0.9),
+    0 0 100px rgba(var(--ooze-rgb), 0.6);
+}
+
+/* hover glitch: two colour-split copies of the word's own text (RGB-style
+   tear) clipped into shifting bands over the base glyphs, plus a matching
+   jitter on the base so the whole word feels like it's tearing, not just
+   the ghosts layered on top. */
+.gate-title-word {
+  position: relative;
+  display: inline-block;
+  cursor: default;
+}
+.gate-title-word::before,
+.gate-title-word::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.gate-title-word:hover {
+  animation: title-glitch-jitter 0.4s steps(2, end) infinite;
+}
+.gate-title-word:hover::before {
+  opacity: 0.85;
+  color: #ff2b4d;
+  animation: title-glitch-1 0.4s steps(2, end) infinite;
+}
+.gate-title-word:hover::after {
+  opacity: 0.85;
+  color: #2bd4ff;
+  animation: title-glitch-2 0.4s steps(2, end) infinite;
+}
+@keyframes title-glitch-jitter {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-2px, 1px); }
+  40% { transform: translate(2px, -1px); }
+  60% { transform: translate(-1px, 0); }
+  80% { transform: translate(1px, 1px); }
+}
+@keyframes title-glitch-1 {
+  0% { clip-path: inset(0 0 85% 0); transform: translate(-3px, -2px); }
+  20% { clip-path: inset(10% 0 60% 0); transform: translate(3px, 1px); }
+  40% { clip-path: inset(40% 0 30% 0); transform: translate(-3px, 2px); }
+  60% { clip-path: inset(70% 0 5% 0); transform: translate(3px, -1px); }
+  80% { clip-path: inset(20% 0 65% 0); transform: translate(-2px, 1px); }
+  100% { clip-path: inset(0 0 85% 0); transform: translate(-3px, -2px); }
+}
+@keyframes title-glitch-2 {
+  0% { clip-path: inset(60% 0 5% 0); transform: translate(3px, 2px); }
+  20% { clip-path: inset(15% 0 55% 0); transform: translate(-3px, -1px); }
+  40% { clip-path: inset(35% 0 45% 0); transform: translate(3px, -2px); }
+  60% { clip-path: inset(5% 0 75% 0); transform: translate(-3px, 1px); }
+  80% { clip-path: inset(50% 0 20% 0); transform: translate(2px, -1px); }
+  100% { clip-path: inset(60% 0 5% 0); transform: translate(3px, 2px); }
+}
 .gate-sub {
   max-width: 34ch;
   font-size: clamp(12px, 1vw, 14px);
@@ -283,6 +469,8 @@ a {
   opacity: 0.7;
 }
 .gate-enter {
+  position: relative;
+  overflow: hidden;
   padding: 0.9em 3.2em;
   border: 1px solid var(--accent);
   background: transparent;
@@ -303,8 +491,60 @@ a {
   box-shadow: 0 0 26px rgba(var(--accent-rgb), 0.6);
 }
 .gate-enter:disabled {
-  opacity: 0.4;
+  opacity: 0.6;
   cursor: wait;
+}
+/* real asset-load progress (useProgress), filling left to right behind the
+   label — not a fake spinner. The shimmer keeps it visibly alive even
+   during the loader's documented false-100% plateau between asset batches
+   (see the "ready" signal note in CLAUDE.md), when the fill itself pauses. */
+.gate-enter-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  background-color: rgba(var(--accent-rgb), 0.24);
+  background-image: repeating-linear-gradient(
+    115deg,
+    transparent 0 10px,
+    rgba(var(--bone-rgb), 0.22) 10px 14px,
+    transparent 14px 24px
+  );
+  animation: gate-fill-shimmer 1.4s linear infinite;
+  transition: transform 0.4s ease;
+  will-change: transform;
+}
+@keyframes gate-fill-shimmer {
+  from { background-position: 0 0; }
+  to { background-position: -48px 0; }
+}
+.gate-enter-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+}
+.gate-enter-dots {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 0.5em;
+}
+.gate-enter-dots span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.25;
+  animation: gate-dot-pulse 1.2s ease-in-out infinite;
+}
+.gate-enter-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.gate-enter-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes gate-dot-pulse {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
 }
 
 /* ---------- HUD ---------- */
@@ -431,6 +671,39 @@ a {
   line-height: 1.65;
   color: var(--bone);
   opacity: 0.75;
+}
+
+/* pile lore card — floats over the field beat's glowing piles (Barn.jsx),
+   anchored to the pile's 3D position by drei's <Html>. The wrapping div
+   Html renders into (see FieldPiles) carries its own transform, nudged
+   upward every frame whenever the card would otherwise land on top of
+   .panel — so this class only owns the card's own look, not its placement.
+   Same language as .panel (dark glass, left rule, index/title/body), sized
+   for a compact popover rather than a fixed HUD panel. */
+.pile-tip {
+  width: min(240px, 62vw);
+  padding: 0.85rem 1rem;
+  background: rgba(7, 11, 9, 0.88);
+  border-left: 2px solid var(--accent);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: pile-tip-in 0.22s ease both;
+}
+@keyframes pile-tip-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+}
+.pile-tip-title {
+  font-size: 10.5px;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+}
+.pile-tip-body {
+  margin-top: 0.45rem;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--bone);
+  opacity: 0.85;
 }
 
 /* launch hub (gate beat) */

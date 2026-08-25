@@ -78,12 +78,13 @@ export function makeGateWoodTexture(seed = 1) {
     g.fillRect(x0 + PLANK_W - 2, 0, 2, H)
   }
 
-  // overall vignette so the tile itself already reads dark toward its edges
-  const vg = g.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.75)
-  vg.addColorStop(0, 'rgba(0, 0, 0, 0)')
-  vg.addColorStop(1, 'rgba(0, 0, 0, 0.5)')
-  g.fillStyle = vg
-  g.fillRect(0, 0, W, H)
-
+  // NO per-tile vignette here on purpose: a radial gradient baked into a
+  // 600px tile darkens toward THAT tile's own edges, and repeat-x then
+  // stamps a dark seam every 600px instead of one continuous door — on any
+  // panel wider than one tile (i.e. every desktop viewport) it read as the
+  // wood cutting off partway across the leaf. The gate already gets a
+  // single continuous edge vignette from the DOM side (.gate::after in
+  // index.css), which doesn't have this problem because it's sized to the
+  // whole gate, not to one tile.
   return c.toDataURL('image/png')
 }

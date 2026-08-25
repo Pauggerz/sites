@@ -1,11 +1,12 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Sparkles } from '@react-three/drei'
+import { Billboard, Html, Line, Sparkles } from '@react-three/drei'
 import * as THREE from 'three'
 import BullStatue, { DROP_WORLD } from './BullStatue.jsx'
 import ScreenBoard from './ScreenBoard.jsx'
 import GateShow from './GateShow.jsx'
-import { IS_MOBILE } from '../device.js'
+import { IS_MOBILE, IS_TOUCH } from '../device.js'
+import { PILE_LORE, STAR_LORE } from '../copy.js'
 import {
   MOON,
   tickTime,
@@ -22,11 +23,14 @@ import {
   FOG_COLOR,
   FOG_FAR,
   lightShaftMaterial,
+  glowAuraMaterial,
   mistMaterial,
   dustMaterial,
   makeDustGeometry,
   makePosterHerdTexture,
   makePosterFeedTexture,
+  makePosterWantedTexture,
+  makePosterNoticeTexture,
   makeNoteTexture,
   makeSackTexture,
   makeTreeTexture,
@@ -96,17 +100,21 @@ function Shell() {
   }, [])
   return (
     <group>
-      {/* packed dirt floor */}
+      {/* packed dirt floor — depth run past the real 10 (z -5..5) for the
+          same reason as the roof skin (see Roof(), below): a wide desktop
+          FOV is derived from a fixed vertical camera.fov, so it can see
+          past a surface sized to the barn's exact footprint into flat
+          canvas-clear colour. Pure overhang past the walls either end. */}
       <mesh position={[0, -0.05, 0]} material={dirt}>
-        <boxGeometry args={[12, 0.1, 10]} />
+        <boxGeometry args={[12, 0.1, 22]} />
       </mesh>
 
-      {/* side walls */}
+      {/* side walls — same overrun, same reason */}
       <mesh position={[-6, 2.25, 0]} material={wallLeft}>
-        <boxGeometry args={[0.1, 4.5, 10]} />
+        <boxGeometry args={[0.1, 4.5, 22]} />
       </mesh>
       <mesh position={[6, 2.25, 0]} material={wallPlain}>
-        <boxGeometry args={[0.1, 4.5, 10]} />
+        <boxGeometry args={[0.1, 4.5, 22]} />
       </mesh>
 
       {/* back wall around the door bay (x -0.5..3.5, 3.8 high) */}
@@ -172,12 +180,19 @@ function Roof() {
   const TRUSS_Z = [-4.5, -2.25, 0, 2.25, 4.5]
   return (
     <group>
-      {/* roof skin above the frame */}
+      {/* roof skin above the frame — sized past the truss frame's real 6.3x10
+          footprint on purpose. camera.fov is vertical only (CameraRig.jsx);
+          on a wide/ultrawide desktop the derived horizontal FOV opens up
+          without the poses changing, and a skin sized to the exact frame
+          let the camera see past its edge into flat canvas-clear colour —
+          a sharp, out-of-place wedge at the top corners of frame. The extra
+          margin here is pure overhang past the last truss, never seen
+          straight-on, so it reads as more roof rather than a visible seam. */}
       <mesh position={[-3, 5.52, 0]} rotation={[0, 0, ROOF_PITCH]} material={skin}>
-        <boxGeometry args={[6.3, 0.07, 10]} />
+        <boxGeometry args={[9, 0.07, 22]} />
       </mesh>
       <mesh position={[3, 5.52, 0]} rotation={[0, 0, -ROOF_PITCH]} material={skin}>
-        <boxGeometry args={[6.3, 0.07, 10]} />
+        <boxGeometry args={[9, 0.07, 22]} />
       </mesh>
 
       {/* A-frame trusses: rafters, tie beam, king post, struts */}
@@ -533,23 +548,82 @@ function GrassField() {
 }
 
 // the whole point of the beat: piles out in the field, each with a burst of
-// taller, greener growth erupting around it
+// taller, greener growth erupting around it. Three of the original nine
+// moved up into the sky (Constellation, below) — their lore didn't belong
+// underfoot — so this is six, not nine; still spans near cluster to
+// thinning-toward-the-horizon so the field still reads as seeded throughout.
 const FIELD_PILES = [
   [3.4, -8.2],
   [-2.6, -10.3],
   [8.5, -16.5],
   [-6.8, -19],
-  [1.6, -23],
-  [12.5, -13],
-  // the growth keeps going past the near cluster — piles thinning toward
-  // the horizon so the whole field reads as seeded, not just the doorway
   [-14.5, -27],
   [17.0, -31],
-  [-4.0, -39],
 ]
 const TUFTS_PER_PILE = IS_MOBILE ? 10 : 18
 
-function FieldPiles() {
+// the tell that a pile has content: neon green, the same green as every
+// other interactive cue on the site (buttons, dock, links), so it reads
+// immediately as "clickable" rather than as scenery. Three parts working
+// together, all keyed to the same idle-pulse / hot-flare state: a bright
+// core (ember), a real point light (rim-lights the muck), and a big
+// camera-facing aura disc (glowAuraMaterial) sized past the pile's own
+// silhouette — additive and bright enough that Bloom blows it out, so at
+// full flare the pile reads as a glowing green shape rather than a lit
+// muck pile. toneMapped: false on the ember so its bright state clears
+// Bloom's luminance threshold even though the muck around it is too dark
+// and low-albedo to bloom on its own.
+const PILE_GLOW_IDLE = new THREE.Color('#a8d84a').multiplyScalar(1.8)
+const PILE_GLOW_HOT = new THREE.Color('#e2ffc0').multiplyScalar(5.5)
+const AURA_COLOR_IDLE = new THREE.Color('#a8d84a')
+const AURA_COLOR_HOT = new THREE.Color('#d6ffb0')
+const pileGlowScratch = new THREE.Color()
+
+// the lore card anchors above the pile in 3D (drei <Html>), but a card that
+// floats wherever the projection lands can end up on top of the beat panel
+// (bottom-left, App.jsx .panel) — checked and nudged upward every frame
+// while a card is open, rather than fixed to a screen corner. Shared by
+// FieldPiles and Constellation (below), since both anchor a card the same
+// way — one function so a fix to the overlap logic can't drift between
+// the two copies.
+const PILE_TIP_ANCHOR_Y = 1.05
+const TIP_AVOID_MARGIN = 20
+const TIP_HALF_W = 145
+const TIP_CARD_H_ESTIMATE = 130
+const tipProject = new THREE.Vector3()
+
+// positions an open lore card's wrapper div from its anchor's world
+// position: above the anchor by default (with an upward nudge if that would
+// overlap .panel), but flipped to sit BELOW the anchor when it's too close
+// to the top of the viewport for the card to fit above it — the piles never
+// hit that case, but the constellation sits high in frame and previously
+// ran the card straight off the top of the page.
+function positionTipCard(el, worldPos, camera, size, panelElRef) {
+  tipProject.set(worldPos[0], worldPos[1], worldPos[2]).project(camera)
+  const sx = (tipProject.x * 0.5 + 0.5) * size.width
+  const sy = (1 - (tipProject.y * 0.5 + 0.5)) * size.height
+
+  if (sy < TIP_CARD_H_ESTIMATE + TIP_AVOID_MARGIN) {
+    el.style.transform = 'translate(-50%, 14px)'
+    return
+  }
+
+  if (!panelElRef.current || !document.body.contains(panelElRef.current)) {
+    panelElRef.current = document.querySelector('.panel')
+  }
+  let dy = 0
+  const panelEl = panelElRef.current
+  if (panelEl) {
+    const r = panelEl.getBoundingClientRect()
+    const xOverlap = sx + TIP_HALF_W > r.left && sx - TIP_HALF_W < r.right
+    if (xOverlap && sy > r.top - TIP_AVOID_MARGIN) {
+      dy = r.top - TIP_AVOID_MARGIN - sy
+    }
+  }
+  el.style.transform = `translate(-50%, calc(-100% + ${dy.toFixed(0)}px))`
+}
+
+function FieldPiles({ focus }) {
   const muck = useMemo(() => muckMaterial(), [])
   const tuftMat = useMemo(
     () => grassBladeMaterial({ root: [0.03, 0.07, 0.018], tip: [0.16, 0.31, 0.065], sway: 1.15 }),
@@ -570,6 +644,83 @@ function FieldPiles() {
       s.set(0.9 + rand() * 0.5, 1.5 + rand() * 1.1, 0.9 + rand() * 0.5)
     })
   }, [count])
+
+  // which pile's lore card is open — hover on desktop, tap-to-toggle on
+  // touch (there's no hover to rely on there). Dropped the moment the field
+  // loses focus, so a card can't linger open behind another beat.
+  const [active, setActive] = useState(-1)
+  useEffect(() => {
+    if (focus !== 'field') setActive(-1)
+  }, [focus])
+
+  const glowMat = useMemo(
+    () =>
+      FIELD_PILES.map(
+        () => new THREE.MeshBasicMaterial({ color: PILE_GLOW_IDLE.clone(), toneMapped: false })
+      ),
+    []
+  )
+  const auraMat = useMemo(
+    () => FIELD_PILES.map(() => glowAuraMaterial({ color: '#a8d84a', intensity: 0.05 })),
+    []
+  )
+  const lightRefs = useRef([])
+  const tipOffsetRefs = useRef([])
+  const panelElRef = useRef(null)
+
+  // the light and the aura are strong enough (by design — see the comment
+  // above) to bloom past the field itself: with the barn's open doorway
+  // lined up with the nearest pile, that bleed showed up as a big stray
+  // glow inside the barn on every other beat. Both are throttled down to
+  // near-off unless the field beat is actually focused, so the flare only
+  // shows up where it's meant to be seen.
+  const inField = focus === 'field'
+
+  useFrame((state, delta) => {
+    const t = state.clock.elapsedTime
+    FIELD_PILES.forEach((_, i) => {
+      // unsynced per-pile phase so the field glimmers rather than pulsing
+      // in unison
+      const pulse = 0.75 + Math.sin(t * 0.8 + i * 1.7) * 0.25
+      const hot = inField && i === active
+      const mat = glowMat[i]
+      if (mat) {
+        pileGlowScratch.copy(PILE_GLOW_IDLE).multiplyScalar(pulse)
+        mat.color.lerp(hot ? PILE_GLOW_HOT : pileGlowScratch, 1 - Math.exp(-6 * delta))
+      }
+      const light = lightRefs.current[i]
+      if (light) {
+        const target = !inField ? 0.08 : hot ? 15 : 3.4 + pulse * 2
+        light.intensity = THREE.MathUtils.damp(light.intensity, target, 6, delta)
+      }
+      const aura = auraMat[i]
+      if (aura) {
+        aura.uniforms.uColor.value.lerp(
+          hot ? AURA_COLOR_HOT : AURA_COLOR_IDLE,
+          1 - Math.exp(-6 * delta)
+        )
+        const auraTarget = !inField ? 0.05 : hot ? 7.5 : 2.1 + pulse * 1.3
+        aura.uniforms.uIntensity.value = THREE.MathUtils.damp(
+          aura.uniforms.uIntensity.value,
+          auraTarget,
+          6,
+          delta
+        )
+      }
+    })
+
+    // the open lore card avoids the beat panel — see positionTipCard above
+    const el = active >= 0 ? tipOffsetRefs.current[active] : null
+    if (el) {
+      const [px, pz] = FIELD_PILES[active]
+      positionTipCard(el, [px, PILE_TIP_ANCHOR_Y, pz], state.camera, state.size, panelElRef)
+    }
+  })
+
+  const cursor = (on) => {
+    if (!IS_TOUCH) document.body.style.cursor = on ? 'pointer' : ''
+  }
+
   return (
     <group>
       <instancedMesh ref={ref} args={[geo, tuftMat, count]} frustumCulled={false} />
@@ -581,19 +732,264 @@ function FieldPiles() {
           <mesh position={[0.03, 0.42, 0]} scale={[1, 0.5, 1]} material={muck}>
             <sphereGeometry args={[0.34, 8, 6]} />
           </mesh>
+
+          <mesh position={[0.06, 0.56, 0.03]} material={glowMat[i]}>
+            <sphereGeometry args={[0.06, 8, 6]} />
+          </mesh>
+          <pointLight
+            ref={(el) => (lightRefs.current[i] = el)}
+            position={[0.06, 0.6, 0.03]}
+            color="#a8d84a"
+            intensity={0.08}
+            distance={2.1}
+            decay={2}
+          />
+
+          {/* the aura — sized past the pile's own ~1m silhouette so at full
+              flare the glow visibly overwhelms the shape underneath it */}
+          <Billboard position={[0.05, 0.36, 0]}>
+            <mesh material={auraMat[i]} raycast={() => null}>
+              <planeGeometry args={[1.6, 1.6]} />
+            </mesh>
+          </Billboard>
+
+          {/* generous invisible hit target — the muck mounds alone are too
+              small to reliably catch a hover from field distance */}
+          <mesh
+            position={[0, 0.32, 0]}
+            onPointerOver={(e) => {
+              e.stopPropagation()
+              if (IS_TOUCH) return
+              setActive(i)
+              cursor(true)
+            }}
+            onPointerOut={(e) => {
+              e.stopPropagation()
+              if (IS_TOUCH) return
+              setActive((cur) => (cur === i ? -1 : cur))
+              cursor(false)
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (!IS_TOUCH) return
+              setActive((cur) => (cur === i ? -1 : i))
+            }}
+          >
+            <sphereGeometry args={[0.75, 12, 8]} />
+            <meshBasicMaterial visible={false} />
+          </mesh>
+
+          {active === i && PILE_LORE[i] && (
+            <Html position={[0, PILE_TIP_ANCHOR_Y, 0]} style={{ pointerEvents: 'none' }}>
+              <div
+                ref={(el) => (tipOffsetRefs.current[i] = el)}
+                style={{ transform: 'translate(-50%, -100%)' }}
+              >
+                <div className="pile-tip">
+                  <div className="pile-tip-title">{PILE_LORE[i].title}</div>
+                  <div className="pile-tip-body">{PILE_LORE[i].body}</div>
+                </div>
+              </div>
+            </Html>
+          )}
         </group>
       ))}
     </group>
   )
 }
 
+// three stars over the field, laid out as a simple pair of horns against
+// the sky — the origin-myth lore that didn't belong underfoot with the rest
+// of the piles (STAR_LORE, copy.js). Same hover/tap-for-a-card interaction,
+// including the tooltip's live avoidance of the beat panel (TIP_HALF_W /
+// TIP_AVOID_MARGIN, defined above for the piles), but no muck, no grass —
+// just a bright point and a big aura, sized up to compensate for sitting
+// ~70m out rather than the piles' 10-25m.
+// height checked against the field pose's 55° vertical FOV (CameraRig.jsx
+// POSES.field, ~70m to the anchor) so the horn tips sit clear of the top
+// edge with room for the mouse-parallax drift, not right at the crop line
+const STAR_ANCHOR = [1.5, 19, -62]
+const STAR_OFFSETS = [
+  [-4.5, 1.9, 1.8], // left horn tip
+  [0, -0.8, -1.8], // the dip between the horns
+  [4.5, 1.9, 1.8], // right horn tip
+]
+const STAR_POSITIONS = STAR_OFFSETS.map(([dx, dy, dz]) => [
+  STAR_ANCHOR[0] + dx,
+  STAR_ANCHOR[1] + dy,
+  STAR_ANCHOR[2] + dz,
+])
+const STAR_GLOW_IDLE = new THREE.Color('#a8d84a').multiplyScalar(1.8)
+const STAR_GLOW_HOT = new THREE.Color('#e2ffc0').multiplyScalar(5.5)
+const starGlowScratch = new THREE.Color()
+
+function Constellation({ focus }) {
+  const [active, setActive] = useState(-1)
+  useEffect(() => {
+    if (focus !== 'field') setActive(-1)
+  }, [focus])
+
+  const glowMat = useMemo(
+    () =>
+      STAR_POSITIONS.map(
+        () => new THREE.MeshBasicMaterial({ color: STAR_GLOW_IDLE.clone(), toneMapped: false })
+      ),
+    []
+  )
+  const auraMat = useMemo(
+    () => STAR_POSITIONS.map(() => glowAuraMaterial({ color: '#a8d84a', intensity: 0.05 })),
+    []
+  )
+  const tipOffsetRefs = useRef([])
+  const panelElRef = useRef(null)
+
+  const inField = focus === 'field'
+
+  useFrame((state, delta) => {
+    const t = state.clock.elapsedTime
+    STAR_POSITIONS.forEach((_, i) => {
+      const pulse = 0.75 + Math.sin(t * 0.7 + i * 2.1) * 0.25
+      const hot = inField && i === active
+      const mat = glowMat[i]
+      if (mat) {
+        starGlowScratch.copy(STAR_GLOW_IDLE).multiplyScalar(pulse)
+        mat.color.lerp(hot ? STAR_GLOW_HOT : starGlowScratch, 1 - Math.exp(-6 * delta))
+      }
+      const aura = auraMat[i]
+      if (aura) {
+        aura.uniforms.uColor.value.lerp(
+          hot ? STAR_GLOW_HOT : STAR_GLOW_IDLE,
+          1 - Math.exp(-6 * delta)
+        )
+        const auraTarget = !inField ? 0.05 : hot ? 6 : 1.6 + pulse * 0.9
+        aura.uniforms.uIntensity.value = THREE.MathUtils.damp(
+          aura.uniforms.uIntensity.value,
+          auraTarget,
+          6,
+          delta
+        )
+      }
+    })
+
+    // the open lore card avoids the beat panel — see positionTipCard above.
+    // The stars sit high in frame, so this is the case that actually needs
+    // the card's below-the-anchor fallback.
+    const el = active >= 0 ? tipOffsetRefs.current[active] : null
+    if (el) {
+      positionTipCard(el, STAR_POSITIONS[active], state.camera, state.size, panelElRef)
+    }
+  })
+
+  const cursor = (on) => {
+    if (!IS_TOUCH) document.body.style.cursor = on ? 'pointer' : ''
+  }
+
+  return (
+    <group>
+      <Line points={STAR_POSITIONS} color="#7fae3f" lineWidth={1} transparent opacity={0.35} />
+      {STAR_POSITIONS.map(([x, y, z], i) => (
+        <group key={`${x}${y}${z}`} position={[x, y, z]}>
+          <mesh material={glowMat[i]}>
+            <sphereGeometry args={[0.14, 8, 6]} />
+          </mesh>
+
+          <Billboard>
+            <mesh material={auraMat[i]} raycast={() => null}>
+              <planeGeometry args={[3.6, 3.6]} />
+            </mesh>
+          </Billboard>
+
+          {/* generous invisible hit target — the star itself is a speck at
+              this distance */}
+          <mesh
+            onPointerOver={(e) => {
+              e.stopPropagation()
+              if (IS_TOUCH) return
+              setActive(i)
+              cursor(true)
+            }}
+            onPointerOut={(e) => {
+              e.stopPropagation()
+              if (IS_TOUCH) return
+              setActive((cur) => (cur === i ? -1 : cur))
+              cursor(false)
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (!IS_TOUCH) return
+              setActive((cur) => (cur === i ? -1 : i))
+            }}
+          >
+            <sphereGeometry args={[2.2, 10, 8]} />
+            <meshBasicMaterial visible={false} />
+          </mesh>
+
+          {active === i && STAR_LORE[i] && (
+            <Html position={[0, 0, 0]} style={{ pointerEvents: 'none' }}>
+              <div
+                ref={(el) => (tipOffsetRefs.current[i] = el)}
+                style={{ transform: 'translate(-50%, -100%)' }}
+              >
+                <div className="pile-tip">
+                  <div className="pile-tip-title">{STAR_LORE[i].title}</div>
+                  <div className="pile-tip-body">{STAR_LORE[i].body}</div>
+                </div>
+              </div>
+            </Html>
+          )}
+        </group>
+      ))}
+    </group>
+  )
+}
+
+// plain background stars — a static point cloud, not the constellation.
+// No hover, no aura, no per-frame update: dim enough (low opacity, default
+// tone mapping instead of the constellation's toneMapped: false) that it
+// reads as sky texture behind the three real stars rather than competing
+// with them. Spread wide (some will sit off-frame at any one camera angle,
+// which is fine) but kept in front of the sky backdrop plane (z -132) and
+// inside the field beat's fog-far (130) so none of it clips or fogs out.
+const STARFIELD_COUNT = IS_MOBILE ? 90 : 220
+
+function Starfield() {
+  const geo = useMemo(() => {
+    const rand = makeRand(6060)
+    const positions = new Float32Array(STARFIELD_COUNT * 3)
+    for (let i = 0; i < STARFIELD_COUNT; i++) {
+      positions[i * 3] = -170 + rand() * 340
+      positions[i * 3 + 1] = 14 + rand() * 85
+      positions[i * 3 + 2] = -55 - rand() * 70
+    }
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    return g
+  }, [])
+  const mat = useMemo(
+    () =>
+      new THREE.PointsMaterial({
+        color: '#dbe6da',
+        size: 0.32,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+      }),
+    []
+  )
+  return <points geometry={geo} material={mat} frustumCulled={false} />
+}
+
 // scrub bushes scattered through the growth — smaller and far more numerous
 // than the piles, so the field reads as overrun rather than just seeded.
 // GrassField's blades stand 0.38-1.19m tall (0.95 local height * 0.4-1.25
-// scale) — the old h range here (0.45-1.1, top at 0.92h) topped out at
-// ~1.0m and averaged well under grass height, so most shrubs sat *inside*
-// the carpet instead of standing proud of it and read as having vanished.
-// Sized so even the smallest instance clears the tallest blade.
+// scale) — an old h range here (0.45-1.1, top at 0.92h) topped out at ~1.0m
+// and averaged well under grass height, so most shrubs sat *inside* the
+// carpet instead of standing proud of it and read as having vanished. A
+// later range (1.3-2.2) fixed that but ran tall enough to stand between the
+// camera and a pile, undercutting the glow's whole point — trimmed back
+// here while keeping the smallest instance (1.25) just past the tallest
+// blade (1.19), so the fix for one regression doesn't reopen the other.
 const SHRUB_COUNT = IS_MOBILE ? 55 : 130
 
 function Shrubs() {
@@ -605,7 +1001,7 @@ function Shrubs() {
     scatterBlades(ref.current, SHRUB_COUNT, (i, p, e, s) => {
       const x = -30 + rand() * 60
       const z = -9 - Math.pow(rand(), 1.2) * 60
-      const h = 1.3 + rand() * 0.9
+      const h = 1.25 + rand() * 0.45
       p.set(x, h * 0.46, z)
       e.set((rand() - 0.5) * 0.4, rand() * Math.PI, (rand() - 0.5) * 0.4)
       s.set(1.0 + rand() * 0.7, h, 1.0 + rand() * 0.7)
@@ -698,19 +1094,25 @@ const TREES_MID = scatterTrees(IS_MOBILE ? 16 : 34, 5151, {
 })
 
 function TreeLine({ trees }) {
-  const mats = useMemo(
-    () =>
-      trees.map(
-        ([, , , seed]) =>
-          new THREE.MeshBasicMaterial({
-            map: makeTreeTexture(seed),
-            transparent: true,
-            alphaTest: 0.35,
-            fog: true,
-          })
-      ),
-    [trees]
-  )
+  // seeds repeat ((i % 8) + 1 in TREES_MID) — cache one material per seed
+  // instead of redrawing an identical 256x256 canvas for every tree, since
+  // on desktop that was 34 redundant makeTreeTexture() calls down to 8
+  const mats = useMemo(() => {
+    const bySeed = new Map()
+    return trees.map(([, , , seed]) => {
+      let mat = bySeed.get(seed)
+      if (!mat) {
+        mat = new THREE.MeshBasicMaterial({
+          map: makeTreeTexture(seed),
+          transparent: true,
+          alphaTest: 0.35,
+          fog: true,
+        })
+        bySeed.set(seed, mat)
+      }
+      return mat
+    })
+  }, [trees])
   return (
     <group>
       {trees.map(([x, z, size], i) => (
@@ -836,7 +1238,9 @@ function Pasture({ focus }) {
         <planeGeometry args={[632, 220]} />
       </mesh>
       <GrassField />
-      <FieldPiles />
+      <FieldPiles focus={focus} />
+      <Constellation focus={focus} />
+      <Starfield />
       <Shrubs />
       <FenceLine />
       <TreeLine trees={TREES_NEAR} />
@@ -1004,15 +1408,46 @@ function Posters() {
     () => new THREE.MeshStandardMaterial({ map: makePosterFeedTexture(), roughness: 1 }),
     []
   )
+  // two more, past the picture's edge alongside the feed poster — the gate
+  // beat looks straight down this wall, and one poster read as a single
+  // pinned afterthought where a real barn wall would have a cluster
+  const wanted = useMemo(
+    () => new THREE.MeshStandardMaterial({ map: makePosterWantedTexture(), roughness: 1 }),
+    []
+  )
+  const notice = useMemo(
+    () => new THREE.MeshStandardMaterial({ map: makePosterNoticeTexture(), roughness: 1 }),
+    []
+  )
   return (
     <group>
       {/* herd poster under the loft — half-seen unless the board glow is up */}
       <mesh position={[4.7, 2.0, -4.89]} rotation={[0, 0, 0.03]} material={herd}>
         <planeGeometry args={[0.8, 1.07]} />
       </mesh>
-      {/* feed poster sits past the picture's edge, near the front corner */}
-      <mesh position={[-5.92, 2.4, 4.5]} rotation={[0, Math.PI / 2, -0.04]} material={feed}>
+
+      {/* this camera's "left" is world z > 4.1 (the screen's own far edge,
+          not the back of the barn — a lookAt off the wall's diagonal puts
+          the back corner on the RIGHT of frame instead, which is why a
+          cluster planted there read as nothing on the left at all). So the
+          whole papered corner stays on the near side, packed floor-to-eave
+          in the ~0.9m of wall the screen leaves clear rather than spread
+          to a corner that isn't actually in view here. Every mesh keeps
+          its near z edge at 4.15 or later — 0.05m clear of the screen. */}
+      <mesh position={[-5.92, 2.5, 7.6]} rotation={[0, Math.PI / 2, -0.04]} material={feed}>
         <planeGeometry args={[0.8, 1.07]} />
+      </mesh>
+      <mesh position={[-5.93, 3.7, 9.1]} rotation={[0, Math.PI / 2, 0.05]} material={wanted}>
+        <planeGeometry args={[0.7, 0.94]} />
+      </mesh>
+      <mesh position={[-5.93, 1.5, 4.7]} rotation={[0, Math.PI / 2, -0.07]} material={notice}>
+        <planeGeometry args={[0.62, 0.83]} />
+      </mesh>
+      <mesh position={[-5.92, 4.2, 6.6]} rotation={[0, Math.PI / 2, 0.08]} material={herd}>
+        <planeGeometry args={[0.55, 0.74]} />
+      </mesh>
+      <mesh position={[-5.93, 2.9, 5.1]} rotation={[0, Math.PI / 2, -0.05]} material={wanted}>
+        <planeGeometry args={[0.45, 0.6]} />
       </mesh>
     </group>
   )
@@ -1553,7 +1988,25 @@ function Atmosphere({ focus }) {
 
 /* ================= assembled barn ================= */
 
+// Pasture, MuckBoard, GateShow and Posters are beats 03-05 — none of them
+// sit in the 'start'/intro camera framing (that's the door and the bull),
+// so mounting them a tick later costs nothing visible but gives the DOM
+// gate overlay (title glitch, peek-through) one clear run of the main
+// thread before the barn's heaviest piece (Pasture: thousands of grass/
+// shrub/tree instances plus several canvas textures) lands on it — that
+// contention, not any deliberate gating, was what made those animations
+// feel tied to "raising the barn" finishing.
+function useMountAfterFirstPaint() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setMounted(true), 0)
+    return () => clearTimeout(id)
+  }, [])
+  return mounted
+}
+
 export default function Barn({ focus, onCopyCa, onSelect }) {
+  const showLateBeats = useMountAfterFirstPaint()
   return (
     <group>
       <Shell />
@@ -1563,10 +2016,10 @@ export default function Barn({ focus, onCopyCa, onSelect }) {
       <SlidingDoor />
       <Bulb focus={focus} />
       <BullStatue onSelect={onSelect} />
-      <Pasture focus={focus} />
-      <MuckBoard focus={focus} />
-      <GateShow focus={focus} onCopyCa={onCopyCa} />
-      <Posters />
+      {showLateBeats && <Pasture focus={focus} />}
+      {showLateBeats && <MuckBoard focus={focus} />}
+      {showLateBeats && <GateShow focus={focus} onCopyCa={onCopyCa} />}
+      {showLateBeats && <Posters />}
       <Dressing />
       <FloorDressing />
       <Practicals focus={focus} />

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useVideoTexture } from '@react-three/drei'
 import * as THREE from 'three'
@@ -212,10 +212,16 @@ function Projection({ focused }) {
         material={dust}
       />
 
-      {/* the picture, riding the boards */}
+      {/* the picture, riding the boards. VideoFace gets its own Suspense
+          boundary so the 40MB mp4 loads in the background instead of
+          holding up the top-level ReadySignal (Experience.jsx) — the idle
+          screen already exists as the "not ready yet" state, so it doubles
+          as the fallback while the video buffers */}
       <group position={PIC_POS} rotation={[0, Math.PI / 2, 0.008]}>
         {source === 'video' ? (
-          <VideoFace geometry={geometry} gain={gain} />
+          <Suspense fallback={<IdleFace geometry={geometry} gain={gain} />}>
+            <VideoFace geometry={geometry} gain={gain} />
+          </Suspense>
         ) : (
           <IdleFace geometry={geometry} gain={gain} />
         )}
